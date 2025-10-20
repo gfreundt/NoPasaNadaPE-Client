@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='dashboard.css') }}" rel="stylesheet">
+</head>
+
+<body>
+    <div class="container-fluid p-3">
+
+    <div class="row mb-4">
+        <div class="col-md-9 fs-3">
+            <div class="p-3 bg-primary text-white rounded" id="top-left">
+                <img src="{{ url_for('static', filename='logo3.png') }}" width="120" height="120">
+                No Pasa Nada
+            </div>
+        </div>
+        <div class="col-md-3 text-center fs-3">
+            <div class="p-3 rounded" id="top-right">Loading...</div>
+        </div>
+    </div>
+
+    <div class="row mb-4" id="cards-container">
+        {% for i in range(16) %}
+        <div class="col-md-3 mb-3">
+            <div class="card status-0" id="card-{{ i }}">
+                <div class="card-body">
+                    <h5 class="card-title d-flex justify-content-between align-items-center">
+                        <span id="card-title-{{ i }}">Process {{ i+1 }}</span>
+                        <i id="card-icon-{{ i }}" class="bi"></i>
+                    </h5>
+                    <div class="progress mb-2">
+                        <div class="progress-bar" id="card-progress-{{ i }}" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+                    </div>
+                    <p class="card-text" id="card-text-{{ i }}">Status: Idle</p>
+                    <p class="mb-0"><strong id="card-status-label-{{ i }}">Inactive</strong></p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="row mb-4" id="kpis-container">
+        <div class="col-md-9">
+            <div class="p-3 border rounded shadow-sm bg-white">
+                <table class="table table-bordered table-sm text-center mb-3">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Usuarios</th>
+                            <th>Placas</th>
+                            <th>Saldo Truecaptcha</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td id="kpi-members"></td>
+                            <td id="kpi-placas"></td>
+                            <td id="kpi-truecaptcha-balance"></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="d-flex align-items-start mb-2">
+                    <button id="clear-btn" class="btn me-2" style="background-color: #39e75f;">Limpiar</button>
+                    <textarea id="activities-text-area" class="form-control" rows="5" placeholder="Esperando Comando..." style="resize: vertical;" readonly></textarea>
+                </div>
+            </div>
+        </div>
+
+
+
+        <div class="col-md-3 d-flex flex-column justify-content-start">
+            <div class="p-3 border rounded shadow-sm bg-white">
+                <div class="row">
+                    <div class="col-6">
+                        <form method="POST" action="/registros_pendientes" class="mb-3">
+                            <button type="submit" class="btn btn-outline-primary w-100 update-log-btn">Registros Pendientes</button>
+                        </form>
+                        <form method="POST" action="/actualizar" class="mb-3">
+                            <button type="submit" class="btn btn-outline-primary w-100 update-log-btn">Actualizar</button>
+                        </form>
+                        <form method="POST" action="/crear_mensajes" class="mb-3">
+                            <button type="submit" class="btn btn-outline-primary w-100 update-log-btn">Crear Mensajes</button>
+                        </form>
+                        <form method="POST" action="/rp_act_cm" class="mb-3">
+                            <button type="submit"  class="btn btn-primary w-100 update-log-btn">RP + Act + CM</button>
+                        </form>
+                        <form method="POST" action="/enviar_mensajes" class="mb-3">
+                            <button type="submit" class="btn btn-primary w-100 update-log-btn">Enviar Mensajes</button>
+                        </form>
+                    </div>
+                    <div class="col-6">
+                        <form method="POST" action="/test" class="mb-3">
+                            <button type="submit" class="btn btn-success w-100 text-dark update-log-btn">Server Test</button>
+                        </form>
+                        <form method="POST" action="/logs" class="mb-3">
+                            <button type="submit" class="btn btn-warning w-100 text-dark update-log-btn">Logs (100)</button>
+                        </form>
+                        <form method="POST" action="/db_info" class="mb-3">
+                            <button type="submit" class="btn btn-warning w-100 text-dark update-log-btn">DB Info</button>
+                        </form>
+                        <form method="POST" action="/db_backup" class="mb-3">
+                            <button type="submit" class="btn btn-warning w-100 text-dark update-log-btn">DB Local Backup</button>
+                        </form>
+                        <form method="POST" action="/actualizar_de_json" class="mb-3">
+                            <button type="submit" class="btn btn-danger w-100 text-dark update-log-btn">Actualizar de JSON</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+<script src="{{ url_for('static', filename='dashboard.js') }}"></script>
+
+</body>
+</html>
