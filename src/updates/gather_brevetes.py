@@ -17,7 +17,7 @@ def gather(dash, update_data, full_response):
         card=CARD,
         title=f"Brevete [{len(update_data)}]",
         status=1,
-        progress=0,
+        progress=100,
         text="Inicializando",
         lastUpdate="Actualizado:",
     )
@@ -91,29 +91,29 @@ def gather(dash, update_data, full_response):
             except KeyboardInterrupt:
                 quit()
 
-            # except Exception:
+            except Exception:
 
-            #     # control general browser/webpage errors to stop scraping completely
-            #     consecutive_exceptions += 1
-            #     if consecutive_exceptions > 5:
-            #         dash.log(
-            #             card=CARD,
-            #             msg=f"< BREVETE > Error Scraping {doc_tipo}-{doc_num}.",
-            #             status=2,
-            #             lastUpdate=dt.now(),
-            #         )
+                # control general browser/webpage errors to stop scraping completely
+                consecutive_exceptions += 1
+                if consecutive_exceptions > 5:
+                    dash.log(
+                        card=CARD,
+                        msg=f"|ADVERTENCIA| Error {doc_tipo}-{doc_num}.",
+                        status=2,
+                        lastUpdate=dt.now(),
+                    )
 
-            #     # control individual record to skip it
-            #     retry_attempts += 1
-            #     dash.log(
-            #         card=CARD, msg=f"< BREVETE > Retrying Record {doc_tipo}-{doc_num}."
-            #     )
+                # control individual record to skip it
+                retry_attempts += 1
+                dash.log(
+                    card=CARD, msg=f"|ADVERTENCIA| Reintentando {doc_tipo}-{doc_num}."
+                )
 
     # log last action
     dash.log(
         card=CARD,
         title="Brevetes",
-        progress=100,
+        progress=0,
         status=3,
         text="Inactivo",
         lastUpdate=dt.now(),

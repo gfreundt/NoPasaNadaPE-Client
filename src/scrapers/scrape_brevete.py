@@ -5,7 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
-from src.utils.chromedriver import ChromeUtils
+from utils.webdriver import ChromeUtils
 from src.utils.constants import HEADLESS, NETWORK_PATH, MTC_CAPTCHAS
 
 
@@ -138,8 +138,6 @@ def evade_captcha(webdriver):
         By.XPATH,
         "/html/body/div/div[2]/div/mat-dialog-container/app-captcha-imagenes-popup/div/mat-dialog-content/app-captcha-imagenes/div[1]/p",
     ).text.split()[-1]
-
-    print(captcha_img_description)
 
     if MTC_CAPTCHAS.get(captcha_img_description):
         for i in range(1, 9):

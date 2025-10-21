@@ -1,6 +1,6 @@
 from selenium.webdriver.common.by import By
 import time
-from src.utils.chromedriver import ChromeUtils
+from utils.webdriver import ChromeUtils
 from src.utils.constants import HEADLESS
 
 

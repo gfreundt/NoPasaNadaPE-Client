@@ -9,7 +9,6 @@ import subprocess
 import json
 from collections import deque
 import time
-from pprint import pprint
 from src.utils.utils import get_local_ip
 from src.utils.constants import NETWORK_PATH, UPDATER_TOKEN, SERVER_IP, SERVER_IP_TEST
 from src.updates import gather_all
@@ -225,7 +224,7 @@ class Dashboard:
                 os.path.join(NETWORK_PATH, "outbound", i), "w", encoding="utf-8"
             ) as outfile:
                 outfile.write(created_messages[i])
-        print(f"*** Mensajes Creados: {len(created_messages)}")
+        self.log(action=f"[CREAR MENSAJES] Mensajes Creados: {len(created_messages)}")
 
         return redirect("/")
 
@@ -243,7 +242,7 @@ class Dashboard:
             "instruction": "send_messages",
         }
         sent_messages = requests.post(url=self.url, json=_json)
-        print(f"*** Mensajes enviados: {sent_messages.content}")
+        self.log(action=f"*** Mensajes enviados: {sent_messages.content}")
 
         return redirect("/")
 
@@ -251,7 +250,7 @@ class Dashboard:
         try:
             tests.main()
         except KeyboardInterrupt:
-            print("*** Cannot execute test (server offline?)")
+            self.log(action="*** Cannot execute test (server offline?)")
         return redirect("/")
 
     def db_info(self):
@@ -262,7 +261,7 @@ class Dashboard:
             os.path.join(NETWORK_PATH, "security", "latest_info.json"), mode="w"
         ) as outfile:
             json.dump(response, outfile)
-        print("*** DB Info Actualizada")
+        self.log(action="DB Info Actualizada")
         return redirect("/")
 
     def actualizar_logs(self):
@@ -272,11 +271,10 @@ class Dashboard:
             os.path.join(NETWORK_PATH, "security", "latest_logs.json"), mode="w"
         ) as outfile:
             outfile.write(response.text)
-            print("*** Logs Actualizados")
+            self.log(action="Logs Actualizados")
         return redirect("/")
 
     def db_backup(self):
-        print("Iniciando DB Backup Local...")
         cmd = [
             "scp",
             "-i",
@@ -287,7 +285,7 @@ class Dashboard:
             "UserKnownHostsFile=/dev/null",
             "-o",
             "StrictHostKeyChecking=no",
-            "nopasanadape@34.59.226.241:/home/nopasanadape/NoPasaNadaPE/server/data/members.db",
+            "nopasanadape@136.114.214.174:/home/nopasanadape/NoPasaNadaPE-Server/data/members.db",
             f"{NETWORK_PATH}/security/",
         ]
         # copy file from remote server
@@ -302,9 +300,9 @@ class Dashboard:
         )
 
         if result.returncode == 0:
-            print("*** DB Backup Local Correcto")
+            self.log(action="*** DB Backup Local Correcto")
         else:
-            print("Error de Backup:", result.stderr)
+            self.log(action="Error de Backup:" + result.stderr)
 
         return redirect("/")
 
@@ -313,10 +311,10 @@ class Dashboard:
             os.path.join(NETWORK_PATH, "security", "last_update.json"), "r"
         ) as file:
             scraper_responses = json.load(file)
-        print(
-            "Payload Size: ",
-            len(json.dumps(scraper_responses).encode("utf-8")) / 1024 / 1024,
-            "MB",
+        self.log(
+            action="Payload Size: "
+            + len(json.dumps(scraper_responses).encode("utf-8")) / 1024 / 1024
+            + " MB",
         )
         _json = {
             "token": UPDATER_TOKEN,
@@ -325,9 +323,11 @@ class Dashboard:
         }
         server_response = requests.post(url=self.url, json=_json)
         if server_response.status_code == 200:
-            print("Actualizacion Completa")
+            self.log(action="*** Actualizacion Completa")
         else:
-            print(f"Error Enviando Actualizacion: {server_response.status_code}")
+            self.log(
+                action=f"Error Enviando Actualizacion: {server_response.status_code}"
+            )
         return redirect("/")
 
     def log_get(self):

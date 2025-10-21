@@ -49,12 +49,12 @@ MONTHS_3_LETTERS = (
 
 # scrapers headless (debugging)
 HEADLESS = {
-    "brevete": True,
-    "satimp": False,
+    "brevete": False,
+    "satimp": True,
     "soat": True,
     "jneafil": True,
     "jnemulta": True,
-    "osiptel": False,
+    "osiptel": True,
     "satmul": False,
     "recvehic": True,
     "revtec": True,
@@ -85,7 +85,7 @@ MTC_CAPTCHAS = {
     "billetera": 6,
     "botella": 7,
     "camion": 8,
-    "correa": 9,
+    "cinturon": 9,
     "destornillador": 10,
     "edificio": 11,
     "gafas": 12,

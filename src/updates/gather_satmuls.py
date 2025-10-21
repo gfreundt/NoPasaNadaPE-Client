@@ -16,7 +16,7 @@ def gather(dash, update_data, full_update):
         card=CARD,
         title=f"Multas SAT Lima [{len(update_data)}]",
         status=1,
-        progress=0,
+        progress=100,
         text="Inicializando",
         lastUpdate="Actualizado:",
     )
@@ -97,12 +97,12 @@ def gather(dash, update_data, full_update):
             except KeyboardInterrupt:
                 quit()
 
-            # except Exception:
-            #     retry_attempts += 1
-            #     dash.log(
-            #         card=CARD,
-            #         text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {placa}",
-            #     )
+            except Exception:
+                retry_attempts += 1
+                dash.log(
+                    card=CARD,
+                    text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {placa}",
+                )
 
         # if code gets here, means scraping has encountred three consecutive errors, skip record
         dash.log(card=CARD, msg=f"|ERROR| No se pudo procesar {placa}.")
@@ -111,7 +111,7 @@ def gather(dash, update_data, full_update):
     dash.log(
         card=CARD,
         title="Multas SAT Lima",
-        progress=100,
+        progress=0,
         status=3,
         text="Inactivo",
         lastUpdate=dt.now(),

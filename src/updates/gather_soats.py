@@ -22,7 +22,7 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
         card=CARD,
         title=f"Certificados Soat [{total_original}]",
         status=1,
-        progress=0,
+        progress=100,
         text="Inicializando",
         lastUpdate="Actualizado:",
     )
