@@ -1,4 +1,4 @@
-from src.utils.chromedriver import ChromeUtils
+from src.utils.webdriver import ChromeUtils
 from selenium.webdriver.common.by import By
 import time
 import random
