@@ -2,7 +2,7 @@ import time
 from selenium.webdriver.common.by import By
 
 # local imports
-from scr.utils.webdriver import ChromeUtils
+from src.utils.webdriver import ChromeUtils
 from src.utils.constants import HEADLESS
 
 

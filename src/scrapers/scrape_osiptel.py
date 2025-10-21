@@ -4,7 +4,7 @@ from selenium.webdriver.support.ui import Select
 
 
 # local imports
-from scr.utils.webdriver import ChromeUtils
+from src.utils.webdriver import ChromeUtils
 from src.utils.constants import HEADLESS
 
 

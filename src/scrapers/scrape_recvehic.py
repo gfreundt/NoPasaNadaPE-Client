@@ -3,7 +3,7 @@ import io
 import base64
 from selenium.webdriver.common.by import By
 import time
-from scr.utils.webdriver import ChromeUtils
+from src.utils.webdriver import ChromeUtils
 from src.utils.utils import use_truecaptcha
 from src.utils.constants import HEADLESS
 

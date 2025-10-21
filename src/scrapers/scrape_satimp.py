@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
 
 # local imports
-from scr.utils.webdriver import ChromeUtils
+from src.utils.webdriver import ChromeUtils
 from src.utils.utils import use_truecaptcha
 from src.utils.constants import HEADLESS
 

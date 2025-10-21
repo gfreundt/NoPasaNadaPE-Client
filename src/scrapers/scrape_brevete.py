@@ -5,7 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
-from scr.utils.webdriver import ChromeUtils
+from src.utils.webdriver import ChromeUtils
 from src.utils.constants import HEADLESS, NETWORK_PATH, MTC_CAPTCHAS
 
 
