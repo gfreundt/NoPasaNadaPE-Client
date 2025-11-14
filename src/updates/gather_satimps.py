@@ -58,7 +58,7 @@ def gather(
         card=CARD,
         title=f"Impuestos SAT [{total_original}]",
         status=1,
-        progress=100,
+        progress=0,
         text="Inicializando",
         lastUpdate="Actualizado:",
     )
@@ -128,10 +128,13 @@ def gather(
                 # update dashboard with progress and last update timestamp
                 dash.log(
                     card=CARD,
-                    progress=int((queue_update_data.qsize() / total_original) * 100),
+                    progress=int(
+                        ((total_original - queue_update_data.qsize()) / total_original)
+                        * 100
+                    ),
                     lastUpdate=dt.now(),
                 )
-
+                
                 # next record
                 break
 
@@ -153,7 +156,7 @@ def gather(
     dash.log(
         card=CARD,
         title="Impuestos SAT",
-        progress=0,
+        progress=100,
         status=3,
         text="Inactivo",
         lastUpdate=dt.now(),

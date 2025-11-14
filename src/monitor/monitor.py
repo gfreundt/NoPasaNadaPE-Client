@@ -28,6 +28,7 @@ class Dashboard:
         self.data_lock = threading.Lock()
         self.url = f"{SERVER_IP_TEST if test else SERVER_IP}/update"
         self.log_entries = deque(maxlen=55)
+        self.data = {"activities": ""}
 
         # Define routes
         self.app.add_url_rule("/", endpoint="/", view_func=self.dashboard)
@@ -110,6 +111,7 @@ class Dashboard:
         if "action" in kwargs:
             _ft = f"{dt.now():%Y-%m-%d %H:%M:%S} > {kwargs["action"]}"
             self.log_entries.append(_ft)
+            self.data["bottom_left"].append(_ft)
         if "card" in kwargs:
             for field in kwargs:
                 if field == "card":
@@ -248,7 +250,7 @@ class Dashboard:
 
     def hacer_tests(self):
         try:
-            tests.main()
+            tests.main(self)
         except KeyboardInterrupt:
             self.log(action="*** Cannot execute test (server offline?)")
         return redirect("/")
@@ -285,11 +287,12 @@ class Dashboard:
             "UserKnownHostsFile=/dev/null",
             "-o",
             "StrictHostKeyChecking=no",
-            "nopasanadape@136.114.214.174:/home/nopasanadape/NoPasaNadaPE-Server/data/members.db",
+            "nopasanadape@35.208.218.61:/home/nopasanadape/NoPasaNadaPE-Server/data/members.db",
             f"{NETWORK_PATH}/security/",
         ]
         # copy file from remote server
         result = subprocess.run(cmd, capture_output=True, text=True)
+        print(result)
 
         # rename file to append current timestamp
         _now = dt.now().strftime("%Y-%m-%d_%H.%M.%S")
@@ -313,7 +316,7 @@ class Dashboard:
             scraper_responses = json.load(file)
         self.log(
             action="Payload Size: "
-            + len(json.dumps(scraper_responses).encode("utf-8")) / 1024 / 1024
+            + str(len(json.dumps(scraper_responses).encode("utf-8")) / 1024 / 1024)
             + " MB",
         )
         _json = {

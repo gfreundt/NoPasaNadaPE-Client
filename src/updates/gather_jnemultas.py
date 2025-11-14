@@ -14,7 +14,7 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
         card=CARD,
         title=f"JNE Multa [{total_original}]",
         status=1,
-        progress=100,
+        progress=0,
         text="Inicializando",
         lastUpdate="Actualizado:",
     )
@@ -40,13 +40,6 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
                 # update memberLastUpdate table with last update information
                 _now = dt.now().strftime("%Y-%m-%d")
 
-                # update dashboard with progress and last update timestamp
-                dash.log(
-                    card=CARD,
-                    progress=int((queue_update_data.qsize() / total_original) * 100),
-                    lastUpdate=dt.now(),
-                )
-
                 # add foreign key and current date to scraper response
                 with lock:
                     local_response.append(
@@ -57,8 +50,17 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
                         }
                     )
 
+                # update dashboard with progress, last update timestamp and details
                 dash.log(
-                    action=f"[ JNE MULTAS ] {'|'.join([str(i) for i in local_response[-1]])}"
+                    card=CARD,
+                    progress=int(
+                        ((total_original - queue_update_data.qsize()) / total_original)
+                        * 100
+                    ),
+                    lastUpdate=dt.now(),
+                )
+                dash.log(
+                    action=f"[ JNE MULTAS ] {'|'.join([str(i) for i in local_response[-1].values()])}"
                 )
 
                 # skip to next record
@@ -78,7 +80,7 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
     dash.log(
         card=CARD,
         title="JNE Multas",
-        progress=0,
+        progress=100,
         status=3,
         text="Inactivo",
         lastUpdate=dt.now(),

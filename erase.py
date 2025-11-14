@@ -1,16 +1,21 @@
 import requests
+from pprint import pprint
+from src.utils.constants import INTERNAL_AUTH_TOKEN
 
-url = "http://172.20.165.114:5000/alta"
+url = "https://nopasanadape.com/api/v1"
+url = "http://172.20.165.114:5000/admin"
 
-
-token = "6f1a9d4b27c3e8a0f5b19c2d43e7a8d1"
-usuario = "castrol"
-correo = "test@test.com"
+correo = "gfreundt@gmail.com"
 
 
 f = requests.post(
-    url=url, params={"token": token, "usuario": usuario, "correo": correo}
+    url=url,
+    params={
+        "token": INTERNAL_AUTH_TOKEN,
+        "solicitud": "nuevo_password",
+        "correo": correo,
+    },
 )
 
 print(f.status_code)
-print(f.content)
+print(f.content.decode())

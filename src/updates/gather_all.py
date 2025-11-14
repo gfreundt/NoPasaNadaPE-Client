@@ -37,7 +37,8 @@ def gather_threads(dash, all_updates):
     # ----- execute ALONE, wait end to start next gather
 
     # brevetes
-    gather_brevetes.gather(dash, all_updates["brevetes"], full_response)
+    if all_updates.get("brevetes"):
+        gather_brevetes.gather(dash, all_updates["brevetes"], full_response)
 
     # soat (only if change of VPN needed)
     if len(all_updates["soats"]) > 12:
@@ -46,137 +47,147 @@ def gather_threads(dash, all_updates):
     # ----- execute NO HEADLESS no sub-threads (requires user clicking on captcha)
 
     # multas sat
-    all_threads.append(
-        Thread(
-            target=gather_satmuls.gather,
-            args=(dash, all_updates["satmuls"], full_response),
+    if all_updates.get("satmuls"):
+        all_threads.append(
+            Thread(
+                target=gather_satmuls.gather,
+                args=(dash, all_updates["satmuls"], full_response),
+            )
         )
-    )
 
     # ----- execute HEADLESS with sub-threads
 
     # revisiones tecnicas
-    all_threads.append(
-        Thread(
-            target=manage_sub_threads,
-            args=(
-                dash,
-                all_updates["revtecs"],
-                full_response,
-                gather_revtecs,
-                "DataMtcRevisionesTecnicas",
-            ),
+    if all_updates.get("revtecs"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["revtecs"],
+                    full_response,
+                    gather_revtecs,
+                    "DataMtcRevisionesTecnicas",
+                ),
+            )
         )
-    )
 
     # multas sutran
-    all_threads.append(
-        Thread(
-            target=manage_sub_threads,
-            args=(
-                dash,
-                all_updates["sutrans"],
-                full_response,
-                gather_sutrans,
-                "DataSutranMultas",
-            ),
+    if all_updates.get("sutrans"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["sutrans"],
+                    full_response,
+                    gather_sutrans,
+                    "DataSutranMultas",
+                ),
+            )
         )
-    )
 
     # impuestos sat
-    all_threads.append(
-        Thread(
-            target=gather_satimps.manage_sub_threads,
-            args=(dash, all_updates["satimps"], full_response),
+    if all_updates.get("satimps"):
+        all_threads.append(
+            Thread(
+                target=gather_satimps.manage_sub_threads,
+                args=(dash, all_updates["satimps"], full_response),
+            )
         )
-    )
 
     # record de conductores
-    all_threads.append(
-        Thread(
-            target=manage_sub_threads,
-            args=(
-                dash,
-                all_updates["recvehic"],
-                full_response,
-                gather_recvehic,
-                "DataMtcRecordsConductores",
-            ),
+    if all_updates.get("recvehic"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["recvehic"],
+                    full_response,
+                    gather_recvehic,
+                    "DataMtcRecordsConductores",
+                ),
+            )
         )
-    )
 
     # sunat
-    all_threads.append(
-        Thread(
-            target=manage_sub_threads,
-            args=(
-                dash,
-                all_updates["sunats"],
-                full_response,
-                gather_sunats,
-                "DataSunatRucs",
-            ),
+    if all_updates.get("sunats"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["sunats"],
+                    full_response,
+                    gather_sunats,
+                    "DataSunatRucs",
+                ),
+            )
         )
-    )
 
     # lineas osiptel
-    all_threads.append(
-        Thread(
-            target=manage_sub_threads,
-            args=(
-                dash,
-                all_updates["osipteles"],
-                full_response,
-                gather_osipteles,
-                "DataOsiptelLineas",
-            ),
+    if all_updates.get("osipteles"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["osipteles"],
+                    full_response,
+                    gather_osipteles,
+                    "DataOsiptelLineas",
+                ),
+            )
         )
-    )
 
     # multas jne
-    all_threads.append(
-        Thread(
-            target=manage_sub_threads,
-            args=(
-                dash,
-                all_updates["jnemultas"],
-                full_response,
-                gather_jnemultas,
-                "DataJneMultas",
-            ),
+    if all_updates.get("jnemultas"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["jnemultas"],
+                    full_response,
+                    gather_jnemultas,
+                    "DataJneMultas",
+                ),
+            )
         )
-    )
 
     # afiliaciones jne
-    all_threads.append(
-        Thread(
-            target=manage_sub_threads,
-            args=(
-                dash,
-                all_updates["jneafils"],
-                full_response,
-                gather_jneafils,
-                "DataJneAfiliaciones",
-            ),
+    if all_updates.get("jneafils"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["jneafils"],
+                    full_response,
+                    gather_jneafils,
+                    "DataJneAfiliaciones",
+                ),
+            )
         )
-    )
 
     # fichas sunarp
-    all_threads.append(
-        Thread(
-            target=manage_sub_threads,
-            args=(
-                dash,
-                all_updates["sunarps"],
-                full_response,
-                gather_sunarps,
-                "DataSunarpFichas",
-            ),
+    if all_updates.get("sunarps"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["sunarps"],
+                    full_response,
+                    gather_sunarps,
+                    "DataSunarpFichas",
+                ),
+            )
         )
-    )
 
     # soat (only if no need to change VPN)
-    if len(all_updates["soats"]) <= 12:
+    if 0 < len(all_updates["soats"]) <= 12:
         all_threads.append(
             Thread(
                 target=manage_sub_threads,

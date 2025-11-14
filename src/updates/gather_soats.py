@@ -33,6 +33,7 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
         # grab next record from update queue unless empty
         try:
             placa = queue_update_data.get_nowait()
+            print("placa", placa)
         except Empty:
             break
 
@@ -82,13 +83,13 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
                         {
                             "IdPlaca_FK": 999,
                             "Aseguradora": _n[0],
-                            "FechaInicio": _n[1],
-                            "FechaHasta": _n[2],
-                            "PlacaValidate": _n[3],
-                            "Certificado": _n[4],
-                            "Uso": _n[5],
-                            "Clase": _n[6],
-                            "Vigencia": _n[7],
+                            "FechaInicio": _n[2],
+                            "FechaHasta": _n[3],
+                            "PlacaValidate": _n[4],
+                            "Certificado": _n[5],
+                            "Uso": _n[6],
+                            "Clase": _n[7],
+                            "Vigencia": _n[1],
                             "Tipo": _n[8],
                             "FechaVenta": _n[9],
                             "ImageBytes": create_certificate(data=copy(_n)),
@@ -102,6 +103,9 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
                     progress=int((queue_update_data.qsize() / total_original) * 100),
                     lastUpdate=dt.now(),
                 )
+                dash.log(
+                    action=f'[ SOATS ] {"|".join([str(i) for i in local_response[-1].values()])}'
+                )
 
                 # no errors - next member, reset limite counter
                 break
@@ -109,12 +113,12 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
             except KeyboardInterrupt:
                 quit()
 
-            except Exception:
-                retry_attempts += 1
-                dash.log(
-                    card=CARD,
-                    text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {placa}",
-                )
+            # except Exception:
+            #     retry_attempts += 1
+            #     dash.log(
+            #         card=CARD,
+            #         text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {placa}",
+            #     )
 
         # if code gets here, means scraping has encountred three consecutive errors, skip record
         dash.log(card=CARD, msg=f"|ERROR| No se pudo procesar {placa}.")

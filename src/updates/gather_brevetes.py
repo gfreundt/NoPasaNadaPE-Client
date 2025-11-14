@@ -17,7 +17,7 @@ def gather(dash, update_data, full_response):
         card=CARD,
         title=f"Brevete [{len(update_data)}]",
         status=1,
-        progress=100,
+        progress=0,
         text="Inicializando",
         lastUpdate="Actualizado:",
     )
@@ -73,8 +73,9 @@ def gather(dash, update_data, full_response):
                     }
                 )
 
+                # log action and send to dashboard
                 dash.log(
-                    action=f'[ BREVETES ] {"|".join([str(i) for i in full_response["DataMtcBrevetes"][-1]])}'
+                    action=f'[ BREVETES ] {"|".join([str(i) for i in full_response["DataMtcBrevetes"][-1].values()])}'
                 )
 
                 # update dashboard with progress and last update timestamp
@@ -113,7 +114,7 @@ def gather(dash, update_data, full_response):
     dash.log(
         card=CARD,
         title="Brevetes",
-        progress=0,
+        progress=100,
         status=3,
         text="Inactivo",
         lastUpdate=dt.now(),

@@ -1,36 +1,15 @@
-document.addEventListener('DOMContentLoaded', function() {
+// listens for click of Limpiar and wipes text in activities text area
+document.addEventListener('DOMContentLoaded', function () {
     const clearButton = document.getElementById('clear-btn');   // green button
     const textarea = document.getElementById('activities-text-area');
-    const updateButtons = document.querySelectorAll('.update-log-btn');
 
-    function refreshLog() {
-        fetch('/log/get')
-            .then(res => res.json())
-            .then(data => {
-                textarea.value = data.log || "";
-                textarea.scrollTop = textarea.scrollHeight;
-            });
-    }
-
-    clearButton.addEventListener('click', function() {
-        textarea.value = "";  // wipe locally
-        // if you want also to clear server logs, add a /log/clear endpoint
+    clearButton.addEventListener('click', function () {
+        textarea.value = "";
     });
-
-    updateButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            // after server appends to self.log_entries
-            refreshLog();  
-        });
-    });
-
-    // initial load
-    refreshLog();
 });
 
 
-
-
+// updates dashboard regularly
 function updateDashboard() {
         fetch('/data')
             .then(response => response.json())
@@ -103,7 +82,7 @@ function updateDashboard() {
                     }
                 }
 
-                // Update KPIs
+                // Update KPIs and Activities Text Area
                 const kpi_members = document.getElementById('kpi-members');
                 kpi_members.innerHTML = '';  // Clear previous content
                 const div1 = document.createElement('div');
@@ -121,6 +100,9 @@ function updateDashboard() {
                 const div3 = document.createElement('div');
                     div3.innerHTML = data.kpi_truecaptcha_balance;
                 kpi_truecaptcha_balance.appendChild(div3);
+
+                const bottom_left = document.getElementById('activities-text-area');
+                bottom_left.value = data.bottom_left.join('\n');
                 
             });
     }

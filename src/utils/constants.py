@@ -6,7 +6,7 @@ import platform
 if platform.system() == "Linux":
     NETWORK_PATH = os.path.join("/root/pythonCode/nopasanada")
 elif platform.system() == "Windows":
-    NETWORK_PATH = os.path.join("d:", r"\pythonCode", "NoPasaNadaPE - Client")
+    NETWORK_PATH = os.path.join("d:", r"\pythonCode", "NoPasaNadaPE-Client")
 
 DB_NETWORK_PATH = os.path.join(NETWORK_PATH, "data", "members.db")
 DB_LOCAL_PATH = os.path.join("data", "members.db")
@@ -17,11 +17,14 @@ UPDATER_TOKEN = """b3BlbnNzaC1rZXktdjEAAAAACmFlczI1Ni1jdHIAAAAGYmNyeXB0AAAAGAAAA
 VHHd4hXY8dD5yhAAAAGAAAAAEAAAEXAAAAB3NzaC1yc2EAAAADAQABAAABAQDlg8ho2tsN
 CucL7iimU7P57OMdXsVPGnf8KdEHeX7r+1+V1KSSFPRFOPlBixsxNurtUKG7jNpvn/MqRJ
 """
+API_TOKEN_MAQUINARIAS = "6f1a9d4b27c3e8a0f5b19c2d43e7a8d1"
+
 
 SERVER_IP_TEST = "http://172.20.165.114:5000"
 # SERVER_IP = "http://10.128.0.2:5000"
 SERVER_IP = "https://www.nopasanadape.com"
 
+INTERNAL_AUTH_TOKEN = "xsw5R0oHBUJWJhxUqTmHdGmuYhHUNVy62bdJMPtxFjXgjdpCg5K3NgIXQkqwxCujUQ5GtC7m8GWe8JawqlOEkYdmUQLcQTLy"
 
 # info email account
 ZOHO_INFO_PASSWORD = "5QJWEKi0trAL"
