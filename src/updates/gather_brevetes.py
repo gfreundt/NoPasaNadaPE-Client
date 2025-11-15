@@ -22,6 +22,8 @@ def gather(dash, update_data, full_response):
         lastUpdate="Actualizado:",
     )
 
+    consecutive_exceptions = 0
+
     # iterate on all records that require updating and get scraper results
     for counter, (id_member, doc_tipo, doc_num) in enumerate(update_data):
 
@@ -92,11 +94,11 @@ def gather(dash, update_data, full_response):
             except KeyboardInterrupt:
                 quit()
 
-            except Exception:
-
+            except Exception as e:
+                print(f"Error (cotinue): {e}")
                 # control general browser/webpage errors to stop scraping completely
                 consecutive_exceptions += 1
-                if consecutive_exceptions > 5:
+                if consecutive_exceptions > 3:
                     dash.log(
                         card=CARD,
                         msg=f"|ADVERTENCIA| Error {doc_tipo}-{doc_num}.",

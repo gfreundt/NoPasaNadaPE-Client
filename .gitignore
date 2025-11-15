@@ -5,3 +5,5 @@ outbound/
 security/
 chromedriver*
 git
+erase.py
+latest_update.json
