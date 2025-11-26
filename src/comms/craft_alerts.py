@@ -17,7 +17,7 @@ def craft(db_cursor, dash):
 
     # loop all members that required an alert
     db_cursor.execute(
-        "SELECT IdMember_FK, TipoAlerta, Vencido, FechaHasta, Placa FROM _necesitan_alertas"
+        "SELECT IdMember_FK, TipoAlerta, Vencido, FechaHasta, Placa FROM _actualizar_alertas"
     )
     for idmember, tipo_alerta, vencido, fecha_hasta, placa in db_cursor.fetchall():
 

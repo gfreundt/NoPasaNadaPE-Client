@@ -82,12 +82,12 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
             except KeyboardInterrupt:
                 quit()
 
-            except Exception:
-                retry_attempts += 1
-                dash.log(
-                    card=CARD,
-                    text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {doc_num}",
-                )
+            # except Exception:
+            #     retry_attempts += 1
+            #     dash.log(
+            #         card=CARD,
+            #         text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {doc_num}",
+            #     )
 
     # log last action
     dash.log(

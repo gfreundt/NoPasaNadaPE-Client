@@ -1,5 +1,6 @@
 from flask import Flask, render_template, jsonify, redirect
 import threading
+import inspect
 import logging
 from copy import deepcopy as copy
 import os
@@ -9,13 +10,64 @@ import subprocess
 import json
 from collections import deque
 import time
+from src.monitor import auto_scraper
 from src.utils.utils import get_local_ip
-from src.utils.constants import NETWORK_PATH, UPDATER_TOKEN, SERVER_IP, SERVER_IP_TEST
+from src.utils.constants import (
+    NETWORK_PATH,
+    UPDATER_TOKEN,
+    SERVER_IP,
+    SERVER_IP_TEST,
+)
 from src.updates import gather_all
 from src.test import tests
 
+from pprint import pprint
+
 
 logging.getLogger("werkzeug").disabled = True
+
+
+class ThreadMonitor:
+    def __init__(self, include_prefixes=None, include_files=None, interval=1):
+
+        self.include_prefixes = include_prefixes or []
+        self.include_files = include_files or []
+        self.interval = interval
+
+    def is_user_thread(self, thread):
+        return True
+        """Return True only if the thread matches your filters."""
+
+        # 1. Filter by thread name prefix (recommended)
+        if self.include_prefixes:
+            if any(thread.name.startswith(p) for p in self.include_prefixes):
+                return True
+
+        # 2. Filter by file where the thread target function lives
+        if self.include_files:
+            target = getattr(thread, "_target", None)
+            if target:
+                try:
+                    file = inspect.getsourcefile(target) or ""
+                except Exception:
+                    file = ""
+                if any(x in file for x in self.include_files):
+                    return True
+
+        return False
+
+    def start(self):
+        def run():
+            while True:
+                self.user_threads = [
+                    t for t in threading.enumerate() if self.is_user_thread(t)
+                ]
+                time.sleep(self.interval)
+
+        monitor_thread = threading.Thread(
+            target=run, name="ThreadMonitorDaemon", daemon=True
+        )
+        monitor_thread.start()
 
 
 class Dashboard:
@@ -29,6 +81,9 @@ class Dashboard:
         self.url = f"{SERVER_IP_TEST if test else SERVER_IP}/update"
         self.log_entries = deque(maxlen=55)
         self.data = {"activities": ""}
+        self.thread_monitor = ThreadMonitor()
+        self.thread_monitor.start()
+        self.assigned_cards = []
 
         # Define routes
         self.app.add_url_rule("/", endpoint="/", view_func=self.dashboard)
@@ -36,9 +91,15 @@ class Dashboard:
         self.app.add_url_rule("/log/get", "log_get", self.log_get)
 
         self.app.add_url_rule(
-            "/registros_pendientes",
-            endpoint="registros_pendientes",
-            view_func=self.registros_pendientes,
+            "/datos_alertas",
+            endpoint="actualizar_alerta",
+            view_func=self.actualizar_alerta,
+            methods=["POST"],
+        )
+        self.app.add_url_rule(
+            "/datos_boletines",
+            endpoint="actualizar_boletin",
+            view_func=self.actualizar_boletin,
             methods=["POST"],
         )
         self.app.add_url_rule(
@@ -48,15 +109,9 @@ class Dashboard:
             methods=["POST"],
         )
         self.app.add_url_rule(
-            "/crear_mensajes",
+            "/generar_mensajes",
             endpoint="crear_mensajes",
             view_func=self.crear_mensajes,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/rp_act_cm",
-            endpoint="rp_act_cm",
-            view_func=self.rp_act_cm,
             methods=["POST"],
         )
 
@@ -96,6 +151,12 @@ class Dashboard:
             view_func=self.actualizar_de_json,
             methods=["POST"],
         )
+        self.app.add_url_rule(
+            "/auto_scraper",
+            endpoint="auto_scraper",
+            view_func=self.auto_scraper,
+            methods=["GET", "POST"],
+        )
 
         self.set_initial_data()
         self.update_kpis()
@@ -111,7 +172,7 @@ class Dashboard:
         if "action" in kwargs:
             _ft = f"{dt.now():%Y-%m-%d %H:%M:%S} > {kwargs["action"]}"
             self.log_entries.append(_ft)
-            self.data["bottom_left"].append(_ft)
+            self.data["bottom_left"].append(_ft[:140])
         if "card" in kwargs:
             for field in kwargs:
                 if field == "card":
@@ -119,7 +180,7 @@ class Dashboard:
                 self.data["cards"][kwargs["card"]][field] = kwargs[field]
         if "usuario" in kwargs:
             _ft = f"<b>{dt.now():%Y-%m-%d %H:%M:%S} ></b>{kwargs["usuario"]}"
-            self.data["bottom_left"].append(_ft)
+            self.data["bottom_left"].append(_ft[:140])
             if len(self.data["bottom_left"]) > 30:
                 self.data["bottom_left"].pop(0)
             # write to permanent log in database
@@ -139,7 +200,7 @@ class Dashboard:
         self.data = {
             "top_left": "No Pasa Nada Dashboard",
             "top_right": {"content": "Inicializando...", "status": 0},
-            "cards": [copy(empty_card) for _ in range(12)],
+            "cards": [copy(empty_card) for _ in range(32)],
             "bottom_left": [],
             "bottom_right": [],
         }
@@ -159,39 +220,64 @@ class Dashboard:
             r = requests.get(url)
             self.data.update(
                 {
-                    "kpi_truecaptcha_balance": r.json()["data"]["get_user_info"][4][
+                    "kpi_truecaptcha_balance": f'USD {r.json()["data"]["get_user_info"][4][
                         "value"
-                    ]
+                    ]}'
                 }
             )
         except ConnectionError:
-            self.data.update({"truecaptcha_balance": "N/A"})
+            self.data.update({"kpi_truecaptcha_balance": "N/A"})
+
+        self.data.update({"kpi_zeptomail_balance": "N/A"})
 
     def get_data(self):
+        import random
+
+        self.data.update({"kpi_active_threads": len(self.thread_monitor.user_threads)})
+        self.data.update({"kpi_twocaptcha_balance": random.randrange(99)})
+        self.data.update({"kpi_brightdata_balance": random.randrange(99)})
+        self.data.update({"kpi_googlecloud_balance": random.randrange(99)})
+        self.data.update({"kpi_cloudfare_balance": 0})
+
         with self.data_lock:
             return jsonify(self.data)
 
-    def registros_pendientes(self):
+    def actualizar_alerta(self):
         _json = {
             "token": UPDATER_TOKEN,
-            "instruction": "get_records_to_update",
+            "instruction": "actualizar_alerta",
         }
-        self.records_to_update = requests.post(url=self.url, json=_json)
-        _msg = "REGISTROS PENDIENTES: " + "  ".join(
-            [f"{i} = {len(j)}" for i, j in self.records_to_update.json().items()]
+        self.actualizar_datos = requests.post(url=self.url, json=_json)
+        _msg = "ALERTA: " + " ".join(
+            [f"{i}: {len(j)}" for i, j in self.actualizar_datos.json().items()]
+        )
+        self.log(action=_msg)
+
+        print(self.actualizar_datos.json())
+
+        return redirect("/")
+
+    def actualizar_boletin(self):
+        _json = {
+            "token": UPDATER_TOKEN,
+            "instruction": "actualizar_boletin",
+        }
+        self.actualizar_datos = requests.post(url=self.url, json=_json)
+        _msg = "BOLETIN: " + " ".join(
+            [f"{i[:4]}={len(j)}" for i, j in self.actualizar_datos.json().items()]
         )
         self.log(action=_msg)
 
         return redirect("/")
 
     def actualizar(self):
-        if not hasattr(self, "records_to_update"):
+        if not hasattr(self, "actualizar_datos"):
             self.log(action="ACTUALIZAR: ERROR - Correr Registros Pendientes Antes")
         else:
             self.log(action="ACTUALIZAR: En proceso")
 
             scraper_responses = gather_all.gather_threads(
-                dash=self, all_updates=self.records_to_update.json()
+                dash=self, all_updates=self.actualizar_datos.json()
             )
             with open("latest_update.json", "w") as outfile:
                 outfile.write(json.dumps(scraper_responses))
@@ -208,6 +294,9 @@ class Dashboard:
                 )
             else:
                 self.log(action=f"[ERROR] Actualizacion: {server_response.status_code}")
+
+            # borrar informacion de datos para actualizar, obliga a actualizarlos
+            delattr(self, "actualizar_datos")
 
         return redirect("/")
 
@@ -231,6 +320,7 @@ class Dashboard:
         return redirect("/")
 
     def rp_act_cm(self):
+        return
         self.registros_pendientes()
         time.sleep(3)
         self.actualizar()
@@ -292,7 +382,6 @@ class Dashboard:
         ]
         # copy file from remote server
         result = subprocess.run(cmd, capture_output=True, text=True)
-        print(result)
 
         # rename file to append current timestamp
         _now = dt.now().strftime("%Y-%m-%d_%H.%M.%S")
@@ -332,6 +421,10 @@ class Dashboard:
                 action=f"Error Enviando Actualizacion: {server_response.status_code}"
             )
         return redirect("/")
+
+    def auto_scraper(self):
+        print(f"********* AUTOSCRAPER TRIGGERED {dt.now()}")
+        return auto_scraper.main(self)
 
     def log_get(self):
         return jsonify(log="\n".join(self.log_entries))

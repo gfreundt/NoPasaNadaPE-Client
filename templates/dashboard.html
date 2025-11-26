@@ -12,105 +12,138 @@
 <body>
     <div class="container-fluid p-3">
 
-    <div class="row mb-4">
-        <div class="col-md-9 fs-3">
-            <div class="p-3 bg-primary text-white rounded" id="top-left">
-                <img src="{{ url_for('static', filename='logo3.png') }}" width="120" height="120">
-                No Pasa Nada
-            </div>
-        </div>
-        <div class="col-md-3 text-center fs-3">
-            <div class="p-3 rounded" id="top-right">Loading...</div>
-        </div>
-    </div>
+    <!-- Top Headers (Left and Right boxes) have been removed as requested -->
 
-    <div class="row mb-4" id="cards-container">
-        {% for i in range(16) %}
-        <div class="col-md-3 mb-3">
-            <div class="card status-0" id="card-{{ i }}">
-                <div class="card-body">
-                    <h5 class="card-title d-flex justify-content-between align-items-center">
-                        <span id="card-title-{{ i }}">Process {{ i+1 }}</span>
-                        <i id="card-icon-{{ i }}" class="bi"></i>
-                    </h5>
-                    <div class="progress mb-2">
-                        <div class="progress-bar" id="card-progress-{{ i }}" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+    <div class="row">
+        <!-- Left Main Column: Cards and Table -->
+        <div class="col-lg-8">
+            
+            <!-- Cards Container: 4 horizontal by 8 vertical -->
+            <div class="row mb-4" id="cards-container">
+                {% for i in range(32) %}
+                <div class="col-6 col-md-3 mb-2 px-1">
+                    <div class="card status-0 h-100" id="card-{{ i }}">
+                        <div class="card-body p-2">
+                            <h6 class="card-title d-flex justify-content-between align-items-center mb-1" style="font-size: 0.85rem;">
+                                <span id="card-title-{{ i }}" class="text-truncate">Process {{ i+1 }}</span>
+                                <i id="card-icon-{{ i }}" class="bi" style="font-size: 0.85rem;"></i>
+                            </h6>
+                            <p class="card-text small mb-0" id="card-text-{{ i }}" style="font-size: 0.75rem;">Status: Idle</p>
+                            <p class="mb-0 small" style="font-size: 0.75rem;"><strong id="card-status-label-{{ i }}">Inactive</strong></p>
+                        </div>
                     </div>
-                    <p class="card-text" id="card-text-{{ i }}">Status: Idle</p>
-                    <p class="mb-0"><strong id="card-status-label-{{ i }}">Inactive</strong></p>
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- KPI Table Underneath Cards -->
+            <!-- Wrapped in a row/col structure to match the width and alignment of the cards above -->
+            <div class="row mb-4">
+                <div class="col-12 px-1">
+                    <div class="p-3 border rounded shadow-sm bg-white">
+                        <table class="table table-bordered table-sm text-center mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Threads Activos</th>
+                                    <th>Saldo Truecaptcha</th>
+                                    <th>Saldo Zeptomail</th>
+                                    <th>Saldo 2Captcha</th>
+                                    <th>Saldo BrightData</th>
+                                    <th>Gasto Google Cloud</th>
+                                    <th>Saldo Cloudfare</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <!-- Data is populated via dashboard.js targeting these IDs -->
+                                    <td id="kpi-active-threads"></td>
+                                    <td id="kpi-truecaptcha-balance"></td>
+                                    <td id="kpi-zeptomail-balance"></td>
+                                    <td id="kpi-twocaptcha-balance"></td>
+                                    <td id="kpi-brightdata-balance"></td>
+                                    <td id="kpi-googlecloud-balance"></td>
+                                    <td id="kpi-cloudfare-balance"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </div>
-        {% endfor %}
-    </div>
 
-    <div class="row mb-4" id="kpis-container">
-        <div class="col-md-9">
+        </div>
+
+        <!-- Right Sidebar Column: Text Area and Buttons -->
+        <div class="col-lg-4 d-flex flex-column">
+            
+            <!-- Text Area -->
+            <div class="p-3 border rounded shadow-sm bg-white mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold">Logs</span>
+                    <button id="clear-btn" class="btn btn-sm text-white" style="background-color: #39e75f;">Limpiar</button>
+                </div>
+                <!-- Updated height to 700px to match the approx height of 8 card rows -->
+                <textarea id="activities-text-area" class="form-control" style="resize: vertical; height: 700px;" placeholder="Esperando Comando..." readonly></textarea>
+            </div>
+
+            <!-- Buttons Section Split into 3 Columns -->
             <div class="p-3 border rounded shadow-sm bg-white">
-                <table class="table table-bordered table-sm text-center mb-3">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Usuarios</th>
-                            <th>Placas</th>
-                            <th>Saldo Truecaptcha</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td id="kpi-members"></td>
-                            <td id="kpi-placas"></td>
-                            <td id="kpi-truecaptcha-balance"></td>
-                        </tr>
-                    </tbody>
-                </table>
-                <div class="d-flex align-items-start mb-2">
-                    <button id="clear-btn" class="btn me-2" style="background-color: #39e75f;">Limpiar</button>
-                    <textarea id="activities-text-area" class="form-control" rows="12" placeholder="Esperando Comando..." style="resize: vertical;" readonly></textarea>
-                </div>
-            </div>
-        </div>
-
-
-
-        <div class="col-md-3 d-flex flex-column justify-content-start">
-            <div class="p-3 border rounded shadow-sm bg-white">
-                <div class="row">
-                    <div class="col-6">
-                        <form method="POST" action="/registros_pendientes" class="mb-3">
-                            <button type="submit" class="btn btn-outline-primary w-100 update-log-btn">Registros Pendientes</button>
+                <div class="row g-1">
+                    <!-- Column 1: Alertas -->
+                    <div class="col-4">
+                        <div class="text-center fw-bold mb-2 small">Alertas</div>
+                        <form method="POST" action="/datos_alertas" class="mb-2">
+                            <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Datos</button>
                         </form>
-                        <form method="POST" action="/actualizar" class="mb-3">
-                            <button type="submit" class="btn btn-outline-primary w-100 update-log-btn">Actualizar</button>
+                        <form method="POST" action="/actualizar" class="mb-2">
+                            <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Actualizar</button>
                         </form>
-                        <form method="POST" action="/crear_mensajes" class="mb-3">
-                            <button type="submit" class="btn btn-outline-primary w-100 update-log-btn">Crear Mensajes</button>
+                        <form method="POST" action="/generar_mensajes" class="mb-2">
+                            <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Generar</button>
                         </form>
-                        <form method="POST" action="/rp_act_cm" class="mb-3">
-                            <button type="submit"  class="btn btn-primary w-100 update-log-btn">RP + Act + CM</button>
-                        </form>
-                        <form method="POST" action="/enviar_mensajes" class="mb-3">
-                            <button type="submit" class="btn btn-primary w-100 update-log-btn">Enviar Mensajes</button>
+                        <form method="POST" action="/enviar_mensajes" class="mb-2">
+                            <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Enviar</button>
                         </form>
                     </div>
-                    <div class="col-6">
-                        <form method="POST" action="/test" class="mb-3">
-                            <button type="submit" class="btn btn-success w-100 text-dark update-log-btn">Server Test</button>
+
+                    <!-- Column 2: Boletines (Duplicated Buttons) -->
+                    <div class="col-4">
+                        <div class="text-center fw-bold mb-2 small">Boletines</div>
+                        <form method="POST" action="/datos_boletines" class="mb-2">
+                            <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Datos</button>
                         </form>
-                        <form method="POST" action="/logs" class="mb-3">
-                            <button type="submit" class="btn btn-warning w-100 text-dark update-log-btn">Logs (100)</button>
+                        <form method="POST" action="/actualizar" class="mb-2">
+                            <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Actualizar</button>
                         </form>
-                        <form method="POST" action="/db_info" class="mb-3">
-                            <button type="submit" class="btn btn-warning w-100 text-dark update-log-btn">DB Info</button>
+                        <form method="POST" action="/generar_mensajes" class="mb-2">
+                            <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Generar</button>
                         </form>
-                        <form method="POST" action="/db_backup" class="mb-3">
-                            <button type="submit" class="btn btn-warning w-100 text-dark update-log-btn">DB Local Backup</button>
+                        <form method="POST" action="/enviar_mensajes" class="mb-2">
+                            <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Enviar</button>
                         </form>
-                        <form method="POST" action="/actualizar_de_json" class="mb-3">
-                            <button type="submit" class="btn btn-danger w-100 text-dark update-log-btn">Actualizar de JSON</button>
+                    </div>
+
+                    <!-- Column 3: System (Original Right Column) -->
+                    <div class="col-4">
+                        <div class="text-center fw-bold mb-2 small">Sistema</div>
+                        <form method="POST" action="/test" class="mb-2">
+                            <button type="submit" class="btn btn-success w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Server Test</button>
+                        </form>
+                        <form method="POST" action="/logs" class="mb-2">
+                            <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Logs (100)</button>
+                        </form>
+                        <form method="POST" action="/db_info" class="mb-2">
+                            <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">DB Info</button>
+                        </form>
+                        <form method="POST" action="/db_backup" class="mb-2">
+                            <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">DB Backup</button>
+                        </form>
+                        <form method="POST" action="/actualizar_de_json" class="mb-2">
+                            <button type="submit" class="btn btn-danger w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Actualizar JSON</button>
                         </form>
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
 

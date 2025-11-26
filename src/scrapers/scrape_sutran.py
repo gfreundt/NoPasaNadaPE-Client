@@ -5,9 +5,12 @@ from src.utils.constants import HEADLESS
 
 
 def browser(placa):
-    webdriver = ChromeUtils().init_driver(
+
+    chromedriver = ChromeUtils(
         headless=HEADLESS["sutran"], verbose=False, maximized=True
     )
+    webdriver = chromedriver.direct_driver()
+
     webdriver.get(
         "https://www.sutran.gob.pe/consultas/record-de-infracciones/record-de-infracciones/"
     )

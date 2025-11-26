@@ -15,7 +15,7 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
         card=CARD,
         title=f"Sutran [{total_original}]",
         status=1,
-        progress=100,
+        progress=0,
         text="Inicializando",
         lastUpdate="Actualizado:",
     )
@@ -29,73 +29,68 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
         except Empty:
             break
 
-        retry_attempts = 0
         # loop to catch scraper errors and retry limited times
-        while retry_attempts < 3:
-            try:
-                # log action
-                dash.log(card=CARD, text=f"Procesando: {placa}")
+        try:
+            # log action
+            dash.log(card=CARD, text=f"Procesando: {placa}")
 
-                # send request to scraper
-                sutran_response = scrape_sutran.browser(placa=placa)
+            # send request to scraper
+            sutran_response = scrape_sutran.browser(placa=placa)
 
-                _now = dt.now().strftime("%Y-%m-%d")
+            _now = dt.now().strftime("%Y-%m-%d")
 
-                # update dashboard with progress and last update timestamp
-                dash.log(
-                    card=CARD,
-                    progress=int((queue_update_data.qsize() / total_original) * 100),
-                    lastUpdate=dt.now(),
-                )
+            # update dashboard with progress and last update timestamp
+            dash.log(
+                card=CARD,
+                progress=int(
+                    ((total_original - queue_update_data.qsize()) / total_original)
+                    * 100
+                ),
+                lastUpdate=dt.now(),
+            )
 
-                # if response is blank, skip to next placa
-                if not sutran_response:
-                    with lock:
-                        local_response.append({"Empty": True, "PlacaValidate": placa})
-                    break
-
-                # iterate on all multas
-                for resp in sutran_response:
-                    _n = date_to_db_format(data=resp)
-                    with lock:
-                        local_response.append(
-                            {
-                                "PlacaValidate": placa,
-                                "Documento": _n[0],
-                                "Tipo": _n[1],
-                                "FechaDoc": _n[2],
-                                "CodigoInfrac": _n[3],
-                                "Clasificacion": _n[4],
-                                "LastUpdate": _now,
-                            }
-                        )
-
-                    # insert gathered record of member
-                    dash.log(
-                        action=f"[ SUTRANS ] {"|".join([str(i) for i in local_response[-1]])}"
-                    )
-
-                # no errors - next placa
+            # if response is blank, skip to next placa
+            if not sutran_response:
+                with lock:
+                    local_response.append({"Empty": True, "PlacaValidate": placa})
                 break
 
-            except KeyboardInterrupt:
-                quit()
+            # iterate on all multas
+            for resp in sutran_response:
+                _n = date_to_db_format(data=resp)
+                with lock:
+                    local_response.append(
+                        {
+                            "PlacaValidate": placa,
+                            "Documento": _n[0],
+                            "Tipo": _n[1],
+                            "FechaDoc": _n[2],
+                            "CodigoInfrac": _n[3],
+                            "Clasificacion": _n[4],
+                            "LastUpdate": _now,
+                        }
+                    )
 
-            except Exception:
-                retry_attempts += 1
+                # insert gathered record of member
                 dash.log(
-                    card=CARD,
-                    text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {placa}",
+                    action=f"[ SUTRANS ] {"|".join([str(i) for i in local_response[-1]])}"
                 )
 
-        # if code gets here, means scraping has encountred three consecutive errors, skip record
-        dash.log(card=CARD, msg=f"|ERROR| No se pudo procesar {placa}.")
+        except KeyboardInterrupt:
+            quit()
+
+        except Exception:
+            dash.log(
+                card=CARD,
+                text="|ERROR| Proceso Incompleto",
+            )
+            return
 
     # log last action
     dash.log(
         card=CARD,
         title="Sutran",
-        progress=0,
+        progress=100,
         status=3,
         text="Inactivo",
         lastUpdate=dt.now(),

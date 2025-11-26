@@ -1,123 +1,121 @@
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as td
+import time
+from queue import Empty
 
 # local imports
 from src.utils.utils import date_to_db_format
 from src.scrapers import scrape_brevete
+from src.utils.webdriver import ChromeUtils
+from src.utils.constants import HEADLESS, GATHER_ITERATIONS
 
 
-def gather(dash, update_data, full_response):
+def gather(
+    dash, queue_update_data, local_response, total_original, lock, card, subthread
+):
 
-    # add table to accumulation variable
-    full_response.update({"DataMtcBrevetes": []})
+    # construir webdriver con parametros especificos
+    chromedriver = ChromeUtils(headless=HEADLESS["brevetes"])
+    webdriver = chromedriver.direct_driver()
 
-    CARD = 0
-
-    # log first action
+    # registrar inicio en dashboard
     dash.log(
-        card=CARD,
-        title=f"Brevete [{len(update_data)}]",
+        card=card,
+        title=f"Brevetes ({subthread}) [Pendientes: {total_original}]",
         status=1,
-        progress=0,
-        text="Inicializando",
-        lastUpdate="Actualizado:",
+        lastUpdate="Calulando ETA...",
     )
 
-    consecutive_exceptions = 0
+    # iniciar variables para calculo de ETA
+    tiempo_inicio = time.perf_counter()
+    procesados = 0
 
-    # iterate on all records that require updating and get scraper results
-    for counter, (id_member, doc_tipo, doc_num) in enumerate(update_data):
+    # iterar hasta vaciar la cola compartida con otras instancias del scraper
+    while True:
 
-        # skip member if doc tipo is not DNI (CE mostly) - should have been filtered, double check
-        if doc_tipo != "DNI":
-            continue
+        # intentar extraer siguiente registro de cola compartida
+        try:
+            id_member, doc_tipo, doc_num = queue_update_data.get_nowait()
+        except Empty:
+            # log de salida del scraper
+            dash.log(
+                card=card,
+                status=3,
+                text="Inactivo",
+                lastUpdate=f"Fin: {dt.now()}",
+            )
+            break
 
-        retry_attempts = 0
-        # loop to catch scraper errors and retry limited times
-        while retry_attempts < 3:
-            try:
-                # log action
-                dash.log(card=CARD, text=f"Procesando: {doc_tipo} {doc_num}")
+        # se tiene un registro, intentar extraer la informacion
+        try:
+            dash.log(card=card, text=f"Procesando: {doc_num}")
 
-                # send request to scraper
-                brevete_response = scrape_brevete.browser(doc_num=doc_num)
+            # enviar registro a scraper
+            brevete_response = scrape_brevete.browser_wrapper(
+                doc_num=doc_num, webdriver=webdriver
+            )
 
-                # update memberLastUpdate table with last update information
-                _now = dt.now().strftime("%Y-%m-%d")
-
-                # next record if blank response from scraper
-                if not brevete_response:
-                    full_response["DataMtcBrevetes"].append(
-                        {"Empty": True, "IdMember_FK": id_member}
-                    )
-                    break
-
-                # go to next record if no brevete info
-                if brevete_response == -1:
-                    continue
-
-                # adjust date to match db format (YYYY-MM-DD)
-                _n = date_to_db_format(data=brevete_response)
-
-                # add foreign key and current date to scraper response
-                full_response["DataMtcBrevetes"].append(
-                    {
-                        "IdMember_FK": id_member,
-                        "Clase": _n[0],
-                        "Numero": _n[1],
-                        "Tipo": _n[2],
-                        "FechaExp": _n[3],
-                        "Restricciones": _n[4],
-                        "FechaHasta": _n[5],
-                        "Centro": _n[6],
-                        "Puntos": _n[7],
-                        "Record": _n[8],
-                        "LastUpdate": _now,
-                    }
-                )
-
-                # log action and send to dashboard
+            # si respuesta es texto, hubo un error -- regresar
+            if isinstance(brevete_response, str):
                 dash.log(
-                    action=f'[ BREVETES ] {"|".join([str(i) for i in full_response["DataMtcBrevetes"][-1].values()])}'
+                    card=card,
+                    status=2,
+                    lastUpdate=f"ERROR: {brevete_response}",
                 )
-
-                # update dashboard with progress and last update timestamp
-                dash.log(
-                    card=CARD,
-                    progress=int((counter / len(update_data)) * 100),
-                    lastUpdate=dt.now(),
-                )
-
-                # no errors - next member and resent consecutive exceptions counter
-                consecutive_exceptions = 0
                 break
 
-            except KeyboardInterrupt:
-                quit()
-
-            except Exception as e:
-                print(f"Error (cotinue): {e}")
-                # control general browser/webpage errors to stop scraping completely
-                consecutive_exceptions += 1
-                if consecutive_exceptions > 3:
-                    dash.log(
-                        card=CARD,
-                        msg=f"|ADVERTENCIA| Error {doc_tipo}-{doc_num}.",
-                        status=2,
-                        lastUpdate=dt.now(),
+            # respuesta es en blanco
+            if not brevete_response:
+                with lock:
+                    local_response.append(
+                        {
+                            "Empty": True,
+                            "IdMember_FK": doc_num,
+                        }
                     )
+                continue
 
-                # control individual record to skip it
-                retry_attempts += 1
-                dash.log(
-                    card=CARD, msg=f"|ADVERTENCIA| Reintentando {doc_tipo}-{doc_num}."
-                )
+            # ajustar formato de fechas al de la base de datos (YYYY-MM-DD)
+            _n = date_to_db_format(data=brevete_response)
 
-    # log last action
-    dash.log(
-        card=CARD,
-        title="Brevetes",
-        progress=100,
-        status=3,
-        text="Inactivo",
-        lastUpdate=dt.now(),
-    )
+            # agregar registo a acumulador de respuestas (compartido con otros scrapers)
+            local_response.append(
+                {
+                    "IdMember_FK": id_member,
+                    "Clase": _n[0],
+                    "Numero": _n[1],
+                    "Tipo": _n[2],
+                    "FechaExp": _n[3],
+                    "Restricciones": _n[4],
+                    "FechaHasta": _n[5],
+                    "Centro": _n[6],
+                    "Puntos": _n[7],
+                    "Record": _n[8],
+                    "LastUpdate": dt.now().strftime("%Y-%m-%d"),
+                }
+            )
+
+            # calcular ETA aproximado
+            procesados += 1
+            duracion_promedio = (time.perf_counter() - tiempo_inicio) / procesados
+            eta = dt.now() + td(
+                seconds=duracion_promedio
+                * (queue_update_data.qsize() // GATHER_ITERATIONS)
+            )
+
+            # actualizar dashboard
+            dash.log(
+                card=card,
+                title=f"Brevetes ({subthread}) [Pendientes: {queue_update_data.qsize()//GATHER_ITERATIONS}]",
+                lastUpdate=f"ETA: {str(eta).split('.')[0]}",
+            )
+            dash.log(action=f"[ BREVETES ] {_n[2]}")
+
+        except KeyboardInterrupt:
+            quit()
+
+        except Exception as e:
+            dash.log(card=card, text=f"|BREVETES| Crash (Gather): {e}", status=2)
+            break
+
+    # cerrar el driver antes de volver
+    webdriver.quit()

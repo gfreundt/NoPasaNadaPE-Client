@@ -7,9 +7,9 @@ from src.utils.constants import HEADLESS
 
 
 def browser(doc_num):
-    webdriver = ChromeUtils().init_driver(
-        headless=HEADLESS["jnemulta"], verbose=False, maximized=True
-    )
+    chromedriver = ChromeUtils(headless=HEADLESS["jnemulta"])
+    webdriver = chromedriver.direct_driver()
+
     webdriver.get("https://multas.jne.gob.pe/login")
     time.sleep(1.5)
 

@@ -3,64 +3,81 @@ import io
 import copy
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoAlertPresentException
-from src.utils.webdriver import ChromeUtils
 from src.utils.utils import use_truecaptcha
-from src.utils.constants import HEADLESS
+from func_timeout import func_set_timeout, exceptions
+from src.utils.constants import SCRAPER_TIMEOUT
 
 
-def browser(placa):
+@func_set_timeout(SCRAPER_TIMEOUT["revtec"])
+def browser_wrapper(placa, webdriver):
+    try:
+        return browser(placa, webdriver)
+    except exceptions.FunctionTimedOut:
+        return "Timeout"
 
-    webdriver = ChromeUtils().init_driver(
-        headless=HEADLESS["revtec"], verbose=False, maximized=True
-    )
-    webdriver.get("https://rec.mtc.gob.pe/Citv/ArConsultaCitv")
-    time.sleep(2)
 
-    retry_captcha = False
-    while True:
-        # get captcha in string format
-        captcha_txt = ""
-        while not captcha_txt:
-            if retry_captcha:
-                webdriver.refresh()
-                time.sleep(1)
-            # captura captcha image from webpage, store in variable
-            _captcha_img = webdriver.find_element(By.ID, "imgCaptcha")
-            _img = io.BytesIO(_captcha_img.screenshot_as_png)
-            captcha_txt = use_truecaptcha(_img)["result"]
-            retry_captcha = True
+def browser(placa, webdriver):
 
-        # enter data into fields and run
-        webdriver.find_element(By.ID, "texFiltro").send_keys(placa)
-        time.sleep(0.5)
-        webdriver.find_element(By.ID, "texCaptcha").send_keys(captcha_txt)
-        time.sleep(0.5)
-        webdriver.find_element(By.ID, "btnBuscar").click()
+    intentos_captcha = 0
+    while intentos_captcha < 5:
+
+        # abrir url
+        url = "https://rec.mtc.gob.pe/Citv/ArConsultaCitv"
+        if webdriver.current_url != url:
+            webdriver.get(url)
+            time.sleep(2)
+
+        while True:
+            # resolver captcha
+            captcha_txt = ""
+            while not captcha_txt:
+                _captcha_img = webdriver.find_element(By.ID, "imgCaptcha")
+                _img = io.BytesIO(_captcha_img.screenshot_as_png)
+                captcha_txt = use_truecaptcha(_img)["result"]
+
+            # ingresar placa, texto de captcha y apretar boton buscar
+            campo_placa = webdriver.find_element(By.ID, "texFiltro")
+            campo_placa.clear()
+            campo_placa.send_keys(placa)
+            time.sleep(0.5)
+            webdriver.find_element(By.ID, "texCaptcha").send_keys(captcha_txt)
+            time.sleep(0.5)
+            webdriver.find_element(By.ID, "btnBuscar").click()
+            time.sleep(1)
+
+            # ver si salio una alerta
+            try:
+                alert = webdriver.switch_to.alert
+
+                # captcha equivocado - click y tratar con nuevo captcha
+                if "no es" in alert.text:
+                    alert.accept()
+                    time.sleep(1)
+                    intentos_captcha += 1
+                    continue
+
+                # no hay informacion de placa
+                if "No se" in alert.text:
+                    alert.accept()
+                    return []
+
+            # no hay alerta, capturar datos
+            except NoAlertPresentException:
+                break
+
+        # extraer datos de resultados de web
+        response = []
+
+        for pos in range(1, 9):
+            response.append(webdriver.find_element(By.ID, f"Spv1_{pos}").text)
+
+        if response[6] == "DESAPROBADO":
+            response[5] = copy.deepcopy(response[4])
+            response[7] = "VENCIDO"
+
+        # proceso completo -- dejar la pagina lista para la siguiente placa
+        webdriver.find_element(By.ID, "btnLimpiar").click()
         time.sleep(1)
+        return response
 
-        # look for alert - could mean error in captcha or no data for placa
-        try:
-            alert = webdriver.switch_to.alert
-            if "no es" in alert.text:
-                alert.accept()
-                continue
-            if "No se" in alert.text:
-                webdriver.quit()
-                return []
-        except NoAlertPresentException:
-            break
-
-    # extract data from table and parse relevant data, return a dictionary with RTEC data for each PLACA
-    # TODO: capture ALL revisiones (not just latest) -- response not []
-    response = []
-
-    for pos in range(1, 9):
-        response.append(webdriver.find_element(By.ID, f"Spv1_{pos}").text)
-
-    if response[6] == "DESAPROBADO":
-        response[5] = copy.deepcopy(response[4])
-        response[7] = "VENCIDO"
-
-    # process completed succesfully
-    webdriver.quit()
-    return response
+    return "Exceso Reintentos Captcha"

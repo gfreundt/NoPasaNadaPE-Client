@@ -8,9 +8,9 @@ from src.utils.constants import HEADLESS
 
 def browser(doc_tipo, doc_num):
 
-    webdriver = ChromeUtils().init_driver(
-        headless=HEADLESS["sunat"], verbose=False, maximize=True
-    )
+    chromedriver = ChromeUtils(headless=HEADLESS["sunat"], verbose=False, maximize=True)
+    webdriver = chromedriver.direct_driver()
+
     webdriver.get(
         "https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/FrameCriterioBusquedaWeb.jsp"
     )

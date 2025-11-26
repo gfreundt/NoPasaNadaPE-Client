@@ -20,11 +20,12 @@ CucL7iimU7P57OMdXsVPGnf8KdEHeX7r+1+V1KSSFPRFOPlBixsxNurtUKG7jNpvn/MqRJ
 API_TOKEN_MAQUINARIAS = "6f1a9d4b27c3e8a0f5b19c2d43e7a8d1"
 
 
-SERVER_IP_TEST = "http://172.20.165.114:5000"
+SERVER_IP_TEST = "http://localhost:5000"
 # SERVER_IP = "http://10.128.0.2:5000"
 SERVER_IP = "https://www.nopasanadape.com"
 
 INTERNAL_AUTH_TOKEN = "xsw5R0oHBUJWJhxUqTmHdGmuYhHUNVy62bdJMPtxFjXgjdpCg5K3NgIXQkqwxCujUQ5GtC7m8GWe8JawqlOEkYdmUQLcQTLy"
+EXTERNAL_AUTH_TOKEN = "6f1a9d4b27c3e8a0f5b19c2d43e7a8d1"
 
 # info email account
 ZOHO_INFO_PASSWORD = "5QJWEKi0trAL"
@@ -33,6 +34,27 @@ ZOHO_INFO_PASSWORD = "5QJWEKi0trAL"
 ZOHO_MAIL_API_CLIENT_ID = "1000.400ELE5I2WU72H931RQI8HTIY2Y30E"
 ZOHO_MAIL_API_CLIENT_SECRET = "fe41ea63cc1c667091b32b1068660cf0b44fffd823"
 ZOHO_MAIL_API_REDIRECT_URL = "https://www.nopasanadape.com/redir"
+
+# zeptomail
+ZOHO_INFO_PASSWORD = "5QJWEKi0trAL"
+ZEPTOMAIL_INFO_TOKEN = "Zoho-enczapikey wSsVR60lrkb4B/h8mmGtLutrmA5WDlzxQEwsiVGo7HKvSvrFosc/khXIBgGgT6UcGDFrQDMS9rIgyR4IgDAPjNotnAoGXiiF9mqRe1U4J3x17qnvhDzJXGxclROKKIwNwQRinmZkEs8m+g=="
+
+# BrightData  proxy
+PROXY_DC_USERNAME = (
+    "brd-customer-hl_8874517e-zone-datacenter_proxy1:session_random=1"  # not used
+)
+PROXY_DC_USERNAME = "brd-customer-hl_8874517e-zone-datacenter_proxy1-session-"
+PROXY_RES_USERNAME = (
+    "brd-customer-hl_8874517e-zone-residential_proxy1-country-pe-session-"
+)
+PROXY_DC_PASSWORD = "8ydfm761xeeh"
+PROXY_RES_PASSWORD = "u30iyjwv3gb3"
+PROXY_HOST = "brd.superproxy.io"
+PROXY_PORT = "33335"
+API_KEY = "ef171193dfc40c427dc3c015fc4b247b194752a8f700ad5a45f9c5f17ee4ba4c"
+
+# 2captcha recaptcha solver
+TWOCAPTCHA_API_KEY = "852d1d8f6c105fbc6b5d86abed7a2370"
 
 # 3-letter months
 MONTHS_3_LETTERS = (
@@ -58,9 +80,24 @@ HEADLESS = {
     "jneafil": True,
     "jnemulta": True,
     "osiptel": True,
-    "satmul": False,
-    "recvehic": True,
-    "revtec": True,
+    "satmul": True,
+    "recvehic": False,
+    "revtec": False,
+    "sunarp": True,
+    "sunat": True,
+    "sutran": True,
+}
+
+SCRAPER_TIMEOUT = {
+    "brevetes": False,
+    "satimp": True,
+    "soat": 60,
+    "jneafil": True,
+    "jnemulta": True,
+    "osiptel": True,
+    "satmul": True,
+    "recvehic": False,
+    "revtec": 60,
     "sunarp": True,
     "sunat": True,
     "sutran": True,
@@ -89,7 +126,7 @@ MTC_CAPTCHAS = {
     "botella": 7,
     "camion": 8,
     "cinturon": 9,
-    "destornillador": 10,
+    "desarmador": 10,
     "edificio": 11,
     "gafas": 12,
     "gato": 13,
@@ -114,4 +151,4 @@ MTC_CAPTCHAS = {
     "zapato": 32,
 }
 
-GATHER_ITERATIONS = 4
+GATHER_ITERATIONS = 3

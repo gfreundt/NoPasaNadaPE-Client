@@ -1,95 +1,125 @@
 import os
 import io
 import base64
-from selenium.webdriver.common.by import By
+
+# import pyautogui
 import time
-from src.utils.webdriver import ChromeUtils
+from pathlib import Path
+from selenium.webdriver.common.by import By
 from src.utils.utils import use_truecaptcha
-from src.utils.constants import HEADLESS
+from src.utils.constants import NETWORK_PATH
 
 
-def browser(doc_num):
+def browser(doc_num, webdriver):
 
     # get paths to Downloads folder and destination folder
-    from_path = os.path.join(
-        os.path.expanduser("~/Downloads"), "RECORD DE CONDUCTOR.pdf"
-    )
+    target_folder = Path(os.path.join(NETWORK_PATH, "static"))
 
-    # erase file from Downloads folder before downloading new one
-    if os.path.exists(from_path):
-        os.remove(from_path)
+    for file_path in target_folder.glob("RECORD*.pdf"):
+        file_path.unlink()
 
     # start browser, navigate to url
-    webdriver = ChromeUtils().init_driver(
-        headless=HEADLESS["recvehic"], verbose=False, maximized=True
-    )
-    webdriver.get("https://recordconductor.mtc.gob.pe/")
+    url = "https://recordconductor.mtc.gob.pe/"
+
+    webdriver.get(url)
+    time.sleep(2)
 
     # outer loop: in case captcha is not accepted by webpage, try with a new one
-    retry_captcha = False
     while True:
-        # inner loop: in case OCR cannot figure out captcha, retry new captcha
-        captcha_txt = ""
-        while not captcha_txt:
-            if retry_captcha:
-                webdriver.refresh()
-                time.sleep(2)
-            # capture captcha image from webpage and store in variable
-            try:
+        try:
+            # extraer texto de captcha
+            _captcha_file_like = io.BytesIO(
+                webdriver.find_element(By.ID, "idxcaptcha").screenshot_as_png
+            )
+            captcha_txt = use_truecaptcha(_captcha_file_like)["result"]
 
-                # convert image to text using OCR
-                _captcha_file_like = io.BytesIO(
-                    webdriver.find_element(By.ID, "idxcaptcha").screenshot_as_png
-                )
-                captcha_txt = use_truecaptcha(_captcha_file_like)["result"]
-                retry_captcha = True
-
-            except ValueError:
-                # captcha image did not load, reset webpage
-                webdriver.refresh()
-                time.sleep(1.5)
-
-        # enter data into fields and run
-        webdriver.find_element(By.ID, "txtNroDocumento").send_keys(doc_num)
-        webdriver.find_element(By.ID, "idCaptcha").send_keys(captcha_txt)
-        time.sleep(3)
-        webdriver.find_element(By.ID, "BtnBuscar").click()
-        time.sleep(1)
-
-        # if captcha is not correct, refresh and restart cycle, if no data found, return blank
-        _alerta = webdriver.find_elements(By.ID, "idxAlertmensaje")
-        if _alerta and "ingresado" in _alerta[0].text:
-            # click on "Cerrar" to close pop-up
-            webdriver.find_element(
-                By.XPATH, "/html/body/div[5]/div/div/div[2]/button"
-            ).click()
-            # clear webpage for next iteration and small wait
+            # ingresar en formulario y apretar buscar
+            webdriver.find_element(By.ID, "txtNroDocumento").send_keys(doc_num)
+            webdriver.find_element(By.ID, "idCaptcha").send_keys(captcha_txt)
             time.sleep(1)
-            webdriver.refresh()
-            continue
-        elif _alerta and "PERSONA" in _alerta[0].text:
-            webdriver.quit()
-            return -1
-        else:
+            webdriver.find_element(By.ID, "BtnBuscar").click()
+            time.sleep(3)
+
+            # mensaje de limite de consultas - dormir
+
+            # obtener mensaje de alerta (si hay)
+            _alerta = webdriver.find_elements(
+                By.XPATH, "/html/body/div[5]/div/div/div[1]/label"
+            )
+
+            # mensaje de alerta: captcha equivocado
+            if _alerta and "ingresado" in _alerta[0].text:
+                webdriver.refresh()
+                time.sleep(3)
+                continue
+
+            # mensaje de alerta: no hay informacion de la persona
+            elif _alerta and "PERSONA" in _alerta[0].text:
+                webdriver.quit()
+                return -1
+
+            # no hay alerta - proceder
             break
 
+        except ValueError:
+            # no cargo imagen de captcha, refrescar y volver a intentar
+            webdriver.refresh()
+            time.sleep(3)
+
     # click on download button
+    webdriver.execute_cdp_cmd(
+        "Page.setDownloadBehavior",
+        {
+            "behavior": "allow",
+            "downloadPath": os.path.join(NETWORK_PATH, "static"),
+        },
+    )
     b = webdriver.find_elements(By.ID, "btnprint")
     try:
-        b[0].click()
+        webdriver.execute_script("arguments[0].click();", b[0])
+        time.sleep(2)
+
     except Exception:
         webdriver.quit()
-        return -1
+        return "No Hay Boton Download"
 
-    # wait max 10 sec while file is downloaded
-    count = 0
-    while not os.path.isfile(os.path.join(from_path)) and count < 10:
-        time.sleep(1)
-        count += 1
+    if os.path.isfile(
+        os.path.join(NETWORK_PATH, "static", "RECORD DE CONDUCTOR (2).pdf")
+    ):
+        return "Multiples archivos de PDF."
 
+    # esperar un maximo de 12 segundos hasta que baje el archivo y retornar imagen
+    start_time = time.time()
+    _file = os.path.join(NETWORK_PATH, "static", "RECORD DE CONDUCTOR.pdf")
+    while time.time() - start_time < 12:
+        if os.path.isfile(_file):
+            with open(_file, "rb") as f:
+                webdriver.quit()
+                return base64.b64encode(f.read()).decode("utf-8")
+        time.sleep(0.5)
+
+    # si no se encontro imagen, retornar error
     webdriver.quit()
+    return "No Se Puedo Bajar Archivo"
 
-    # if file was downloaded successfully, decode PDF into bytes --> string
-    if count < 10:
-        with open(from_path, "rb") as f:
-            return base64.b64encode(f.read()).decode("utf-8")
+
+# def click_save_button_if_present(MAX_WAIT_TIME=5):
+
+#     IMAGE_PATH = os.path.join(NETWORK_PATH, "static", "save_button.png")
+#     start_time = time.time()
+
+#     while time.time() - start_time < MAX_WAIT_TIME:
+#         try:
+#             button_location = pyautogui.locateCenterOnScreen(
+#                 IMAGE_PATH, confidence=0.85
+#             )
+#             pyautogui.click(button_location)
+
+#             # boton encontrado
+#             return True
+
+#         except pyautogui.ImageNotFoundException:
+#             time.sleep(0.5)
+
+#     # nunca encontro el boton
+#     return False

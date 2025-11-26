@@ -1,38 +1,46 @@
-import os
 import time
-import pyautogui
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
-from src.utils.webdriver import ChromeUtils
-from src.utils.constants import HEADLESS, NETWORK_PATH, MTC_CAPTCHAS
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from src.utils.constants import MTC_CAPTCHAS, SCRAPER_TIMEOUT
+from func_timeout import func_set_timeout, exceptions
 
 
-def browser(doc_num):
-
-    webdriver = ChromeUtils().init_driver(
-        headless=HEADLESS["brevete"], verbose=False, maximized=False
-    )
-    url = "https://licencias.mtc.gob.pe/#/index"
-
-    # load webpage
-    webdriver.set_page_load_timeout(10)
+@func_set_timeout(SCRAPER_TIMEOUT["brevetes"])
+def browser_wrapper(doc_num, webdriver):
     try:
-        webdriver.get(url)
-    except TimeoutException:
-        webdriver.quit()
-        return {}, []
+        return browser(doc_num, webdriver)
+    except exceptions.FunctionTimedOut:
+        return "Timeout"
 
-    # wait for pop-up button to activate (max 10 sec), then click
+
+def browser(doc_num, webdriver):
+
+    # abrir url
+    url = "https://licencias.mtc.gob.pe/#/index"
+    if webdriver.current_url != url:
+        webdriver.get(url)
+        time.sleep(2)
+    else:
+        webdriver.refresh()
+
+    # esperar a que boton de cerrar pop-up se active (max 15 segundos)
     popup_btn, k = [], 0
-    while not popup_btn and k < 20:
+    while not popup_btn and k < 30:
         popup_btn = webdriver.find_elements(
             By.XPATH,
             "/html/body/div/div[2]/div/mat-dialog-container/app-popupanuncio/div/mat-dialog-actions/button",
         )
         time.sleep(0.5)
         k += 1
+
+    # si se vencio el tiempo, retornar error
+    if k == 30:
+        return "No Se Pudo Continuar de Pop-Up de Inicio"
+
+    # hacer click en boton
     popup_btn[0].click()
 
     # ingresar documento
@@ -44,10 +52,12 @@ def browser(doc_num):
     webdriver.execute_script("arguments[0].click();", checkbox)
     time.sleep(1)
 
-    # evade captcha ("No Soy Un Robot")
-    evade_captcha(webdriver)
+    # evadir captcha ("No Soy Un Robot")
+    exito = evade_captcha(webdriver)
+    if not exito:
+        return "Sin Solucion de Captcha"
 
-    # click on Buscar
+    # click en Buscar
     webdriver.find_element(
         By.XPATH,
         "/html/body/app-root/div[2]/app-home/div/mat-card[1]/form/div[5]/div[1]/button",
@@ -71,12 +81,6 @@ def browser(doc_num):
             ).get_attribute("value")
         )
 
-    # check if no licencia registrada, respond with empty for each field
-    _nr = webdriver.find_elements(By.CLASS_NAME, "div_non_data")
-    if _nr:
-        webdriver.quit()
-        return -1
-
     # next tab (Puntos) - make sure all is populated before tabbing along (with timeout) and wait a little
     timeout = 0
     while not webdriver.find_elements(By.ID, "mat-tab-label-0-0"):
@@ -84,7 +88,7 @@ def browser(doc_num):
         timeout += 1
         if timeout > 10:
             webdriver.quit()
-            return []
+            return "Error en Puntos"
     time.sleep(1.5)
 
     action = ActionChains(webdriver)
@@ -119,35 +123,42 @@ def browser(doc_num):
     response.append(_recordnum[9:] if _recordnum else None)
 
     # process completed succesfully
-    webdriver.quit()
+    webdriver.back()
     return response
 
 
 def evade_captcha(webdriver):
 
-    # click on "No Soy un Robot" checkbox
-    x, y = pyautogui.locateCenterOnScreen(
-        os.path.join(NETWORK_PATH, "static", "mtc_no_soy_un_robot_checkbox.png"),
-        confidence=0.8,
+    visible_checkbox = webdriver.find_element(
+        By.CSS_SELECTOR, "mat-checkbox .mat-checkbox-inner-container"
     )
-    pyautogui.click((x - 15, y))
-    time.sleep(2)
 
-    # identify which image captcha is looking for
-    captcha_img_description = webdriver.find_element(
-        By.XPATH,
-        "/html/body/div/div[2]/div/mat-dialog-container/app-captcha-imagenes-popup/div/mat-dialog-content/app-captcha-imagenes/div[1]/p",
-    ).text.split()[-1]
+    # mueve el mouse y haz click, espera un segundo para que aparezca
+    actions = ActionChains(webdriver)
+    actions.move_to_element(visible_checkbox).click().perform()
+    time.sleep(1)
 
-    if MTC_CAPTCHAS.get(captcha_img_description):
+    # extrae el texto de la imagen que se dene elegir
+    try:
+        descripcion_imagen = WebDriverWait(webdriver, 10).until(
+            EC.presence_of_element_located(
+                (By.XPATH, "//app-captcha-imagenes-popup//p")
+            )
+        )
+    except TimeoutError:
+        return False
+
+    # del texto, la ultima palabra es la que dice que imagen elegir
+    descripcion_imagen_texto = descripcion_imagen.text.split()[-1]
+
+    if MTC_CAPTCHAS.get(descripcion_imagen_texto):
         for i in range(1, 9):
-            _img_filename = f"https://licencias.mtc.gob.pe/assets/captcha/{MTC_CAPTCHAS[captcha_img_description]}.png"
+            _img_filename = f"https://licencias.mtc.gob.pe/assets/captcha/{MTC_CAPTCHAS[descripcion_imagen_texto]}.png"
             _element_xpath = f"/html/body/div/div[2]/div/mat-dialog-container/app-captcha-imagenes-popup/div/mat-dialog-content/app-captcha-imagenes/div[2]/div[{i}]/img"
             element = webdriver.find_element(By.XPATH, _element_xpath)
             if element.get_attribute("src") == _img_filename:
                 element.click()
                 time.sleep(1)
-                return
-    else:
-        print("****** MANUAL CAPTCHA NEEDED")
-        time.sleep(10)
+                return True
+
+    return False

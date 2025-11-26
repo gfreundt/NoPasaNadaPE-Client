@@ -19,12 +19,12 @@ def browser(placa):
     while True:
 
         # start chromedriver
-        webdriver = ChromeUtils().init_driver(
+        chromedriver = ChromeUtils(
             headless=HEADLESS["sunarp"],
-            verbose=True,
             window_size=(1920, 1080),
-            incognito=True,
         )
+
+        webdriver = chromedriver.direct_driver()
 
         # open first URL, wait and open second URL (avoids limiting requests)
         webdriver.get("https://www.gob.pe/sunarp")

@@ -10,9 +10,8 @@ from src.utils.constants import HEADLESS
 
 
 def browser(doc_num, doc_tipo):
-    webdriver = ChromeUtils().init_driver(
-        headless=HEADLESS["satimp"], verbose=False, maximized=True
-    )
+    chromedriver = ChromeUtils(headless=HEADLESS["satimp"])
+    webdriver = chromedriver.direct_driver()
     webdriver.get("https://www.sat.gob.pe/WebSitev8/IncioOV2.aspx")
     # navigate once to Tributo Detalles page with internal URL
     _target = (

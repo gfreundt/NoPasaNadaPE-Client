@@ -1,117 +1,121 @@
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as td
+import time
 from queue import Empty
 
 # local imports
 from src.utils.utils import date_to_db_format
 from src.scrapers import scrape_revtec
+from src.utils.webdriver import ChromeUtils
+from src.utils.constants import HEADLESS, GATHER_ITERATIONS
 
 
-def gather(dash, queue_update_data, local_response, total_original, lock):
+def gather(
+    dash, queue_update_data, local_response, total_original, lock, card, subthread
+):
 
-    CARD = 2
+    # construir webdriver con parametros especificos
+    chromedriver = ChromeUtils(headless=HEADLESS["revtec"])
+    webdriver = chromedriver.direct_driver()
 
-    # log first action
+    # registrar inicio en dashboard
     dash.log(
-        card=CARD,
-        title=f"Revisión Técnica [{total_original}]",
+        card=card,
+        title=f"Revisión Técnica ({subthread}) [Pendientes: {total_original}]",
         status=1,
-        progress=0,
-        text="Inicializando",
-        lastUpdate="Actualizado:",
+        lastUpdate="Calulando ETA...",
     )
 
-    # iterate on every placa and write to database
-    while not queue_update_data.empty():
+    # iniciar variables para calculo de ETA
+    tiempo_inicio = time.perf_counter()
+    procesados = 0
 
-        # grab next record from update queue unless empty
+    # iterar hasta vaciar la cola compartida con otras instancias del scraper
+    while True:
+
+        # intentar extraer siguiente registro de cola compartida
         try:
             placa = queue_update_data.get_nowait()
         except Empty:
+            # log de salida del scraper
+            dash.log(
+                card=card,
+                title=f"Revisión Técnica ({subthread})",
+                status=3,
+                text="Inactivo",
+                lastUpdate=f"Fin: {dt.now()}",
+            )
             break
 
-        retry_attempts = 0
-        # loop to catch scraper errors and retry limited times
-        while retry_attempts < 3:
-            try:
-                # log action
-                dash.log(card=CARD, text=f"Procesando: {placa}")
+        # se tiene un registro, intentar extraer la informacion
+        try:
+            dash.log(card=card, text=f"Procesando: {placa}")
 
-                # send request to scraper
-                revtec_response = scrape_revtec.browser(placa=placa)
+            # enviar registro a scraper
+            revtec_response = scrape_revtec.browser_wrapper(
+                placa=placa, webdriver=webdriver
+            )
 
-                # webpage is down: stop gathering and show error in dashboard
-                if revtec_response == 404:
-                    dash.log(
-                        card=CARD,
-                        status=2,
-                        text="MTC offline",
-                        lastUpdate=dt.now(),
-                    )
-                    return
+            # si respuesta es texto, hubo un error -- regresar
+            if isinstance(revtec_response, str):
+                dash.log(
+                    card=card,
+                    status=2,
+                    lastUpdate=f"ERROR: {revtec_response}",
+                )
+                break
 
-                # update placas table with last update information
-                _now = dt.now().strftime("%Y-%m-%d")
-
-                # empty response if blank response from scraper
-                if not revtec_response:
-                    with lock:
-                        local_response.append(
-                            {
-                                "Empty": True,
-                                "PlacaValidate": placa,
-                            }
-                        )
-                    break
-
-                # adjust date to match db format (YYYY-MM-DD)
-                _n = date_to_db_format(data=revtec_response)
+            # respuesta es en blanco
+            if not revtec_response:
                 with lock:
                     local_response.append(
                         {
-                            "IdPlaca_FK": 999,
-                            "Certificadora": _n[0],
-                            "PlacaValidate": _n[2],
-                            "Certificado": _n[3],
-                            "FechaDesde": _n[4],
-                            "FechaHasta": _n[5],
-                            "Resultado": _n[6],
-                            "Vigencia": _n[7],
-                            "LastUpdate": _now,
+                            "Empty": True,
+                            "PlacaValidate": placa,
                         }
                     )
+                continue
 
-                # update dashboard with progress and last update timestamp
-                dash.log(
-                    card=CARD,
-                    progress=int(
-                        ((total_original - queue_update_data.qsize()) / total_original)
-                        * 100
-                    ),
-                    lastUpdate=dt.now(),
-                )
-                dash.log(
-                    action=f"[ REVTECS ] {'|'.join([str(i) for i in local_response[-1].values()])}"
-                )
+            # ajustar formato de fechas al de la base de datos (YYYY-MM-DD)
+            _n = date_to_db_format(data=revtec_response)
 
-                # skip to next record
-                break
-
-            except KeyboardInterrupt:
-                quit()
-
-            except Exception:
-                retry_attempts += 1
-                dash.log(
-                    card=CARD,
-                    text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {placa}",
+            # agregar registo a acumulador de respuestas (compartido con otros scrapers)
+            with lock:
+                local_response.append(
+                    {
+                        "IdPlaca_FK": 999,
+                        "Certificadora": _n[0],
+                        "PlacaValidate": _n[2],
+                        "Certificado": _n[3],
+                        "FechaDesde": _n[4],
+                        "FechaHasta": _n[5],
+                        "Resultado": _n[6],
+                        "Vigencia": _n[7],
+                        "LastUpdate": dt.now().strftime("%Y-%m-%d"),
+                    }
                 )
 
-    # log last action
-    dash.log(
-        card=CARD,
-        title="Revisión Técnica",
-        progress=100,
-        status=3,
-        text="Inactivo",
-        lastUpdate=dt.now(),
-    )
+            # calcular ETA aproximado
+            procesados += 1
+            duracion_promedio = (time.perf_counter() - tiempo_inicio) / procesados
+            eta = dt.now() + td(
+                seconds=duracion_promedio
+                * (queue_update_data.qsize() // GATHER_ITERATIONS)
+            )
+
+            # actualizar dashboard
+            dash.log(
+                card=card,
+                title=f"Revisión Técnica ({subthread}) [Pendientes: {queue_update_data.qsize()//GATHER_ITERATIONS}]",
+                lastUpdate=f"ETA: {str(eta).split('.')[0]}",
+            )
+            dash.log(action=f"[ REVTECS ] {_n[2]}")
+
+        except KeyboardInterrupt:
+            quit()
+
+        except Exception as e:
+            dash.log(card=card, text=f"|REVTEC| Crash (Gather): {e}", status=2)
+            return
+
+    # cerrar el driver antes de volver
+    webdriver.quit()

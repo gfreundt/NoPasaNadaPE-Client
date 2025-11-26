@@ -1,133 +1,136 @@
 import os
 import io
 import base64
-import time
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as td
 from copy import deepcopy as copy
 from queue import Empty
 from PIL import Image, ImageDraw, ImageFont
+import time
 
 # local imports
-from src.utils.utils import date_to_db_format, use_truecaptcha, change_vpn_manually
-from src.scrapers import scrape_soat
-from src.utils.constants import ASEGURADORAS, NETWORK_PATH
+from src.utils.utils import date_to_db_format
+from src.scrapers import scrape_soat as scraper
+from src.utils.constants import ASEGURADORAS, NETWORK_PATH, HEADLESS, GATHER_ITERATIONS
+from src.utils.webdriver import ChromeUtils
 
 
-def gather(dash, queue_update_data, local_response, total_original, lock):
+def gather(
+    dash, queue_update_data, local_response, total_original, lock, card, subthread
+):
 
-    CARD = 5
+    # construir webdriver con parametros especificos
+    chromedriver = ChromeUtils(
+        headless=HEADLESS["soat"],
+        incognito=True,
+        window_size=(1920, 1080),
+    )
+    webdriver = chromedriver.proxy_driver()
+    same_ip_scrapes = 0
 
-    # log first action
+    # registrar inicio en dashboard
     dash.log(
-        card=CARD,
-        title=f"Certificados Soat [{total_original}]",
+        card=card,
+        title=f"Soat ({subthread}) [Pendientes: {total_original}]",
         status=1,
-        progress=100,
-        text="Inicializando",
-        lastUpdate="Actualizado:",
+        lastUpdate="Calculando ETA...",
     )
 
-    # iterate on every placa and write to database
-    while not queue_update_data.empty():
+    # iniciar variables para calculo de ETA
+    tiempo_inicio = time.perf_counter()
+    procesados = 0
 
-        # grab next record from update queue unless empty
+    # iterar hasta vaciar la cola compartida con otras instancias del scraper
+    while True:
+
+        # intentar extraer siguiente registro de cola compartida
         try:
             placa = queue_update_data.get_nowait()
-            print("placa", placa)
         except Empty:
+            # log de salida del scraper
+            dash.log(
+                card=card,
+                status=3,
+                text="Inactivo",
+                lastUpdate=f"Fin: {dt.now()}",
+            )
             break
 
-        retry_attempts = 0
-        # loop to catch scraper errors and retry limited times
-        while retry_attempts < 3:
-            scraper = scrape_soat.Soat()
-            try:
-                # log action
-                dash.log(card=CARD, text=f"Procesando: {placa}")
+        # se tiene un registro, intentar extraer la informacion
+        try:
+            dash.log(card=card, text=f"Procesando: {placa}")
 
-                # grab captcha image from website and solve and send to scraper
-                captcha_file_like = scraper.get_captcha()
-                captcha = use_truecaptcha(captcha_file_like)["result"]
-                response_soat = scraper.browser(placa=placa, captcha_txt=captcha)
+            # si se esta llegando al limite con un mismo IP, reiniciar con IP nuevo
+            if same_ip_scrapes > 10:
+                webdriver.quit()
+                webdriver = chromedriver.proxy_driver()
 
-                # wrong captcha / no data - try three times if not skip record
-                if response_soat == -1 and retry_attempts < 2:
-                    retry_attempts += 1
-                    continue
-                elif response_soat == -1:
-                    break
+            # aumentar contador de usos del mismo IP y mandar a scraper
+            same_ip_scrapes += 1
+            soat_response = scraper.browser_wrapper(placa=placa, webdriver=webdriver)
 
-                # superado el limite de consultas
-                if response_soat == -2:
-                    print("*********** LIMITE CONSULTAS SOAT ************")
-                    dash.log(card=CARD, text="Cambiando VPN", status=1)
-
-                    # avisa a usuario para cambiar de VPN
-                    time.sleep(1)
-                    attempt = change_vpn_manually()
-                    if not attempt:
-                        dash.log(card=CARD, text="Error Cambiando VPN", status=1)
-                        return
-                    else:
-                        break
-
-                # fatal webdriver error, restart attempt
-                if response_soat == -3:
-                    retry_attempts += 1
-                    continue
-
-                # data correcta, proceder
-                _n = date_to_db_format(data=response_soat)
-                with lock:
-                    local_response.append(
-                        {
-                            "IdPlaca_FK": 999,
-                            "Aseguradora": _n[0],
-                            "FechaInicio": _n[2],
-                            "FechaHasta": _n[3],
-                            "PlacaValidate": _n[4],
-                            "Certificado": _n[5],
-                            "Uso": _n[6],
-                            "Clase": _n[7],
-                            "Vigencia": _n[1],
-                            "Tipo": _n[8],
-                            "FechaVenta": _n[9],
-                            "ImageBytes": create_certificate(data=copy(_n)),
-                            "LastUpdate": dt.now().strftime("%Y-%m-%d"),
-                        }
-                    )
-
-                # update dashboard with progress and last update timestamp
+            # si respuesta es texto, hubo un error -- regresar
+            if isinstance(soat_response, str):
                 dash.log(
-                    card=CARD,
-                    progress=int((queue_update_data.qsize() / total_original) * 100),
-                    lastUpdate=dt.now(),
+                    card=card,
+                    status=2,
+                    lastUpdate=f"ERROR: {soat_response}",
                 )
-                dash.log(
-                    action=f'[ SOATS ] {"|".join([str(i) for i in local_response[-1].values()])}'
-                )
-
-                # no errors - next member, reset limite counter
                 break
 
-            except KeyboardInterrupt:
-                quit()
+            # placa no genera resultados
+            if not soat_response:
+                with lock:
+                    local_response.append({"Empty": True, "PlacaValidate": placa})
+                    break
 
-            # except Exception:
-            #     retry_attempts += 1
-            #     dash.log(
-            #         card=CARD,
-            #         text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {placa}",
-            #     )
+            # placa si tiene resultados
+            _n = date_to_db_format(data=soat_response)
+            with lock:
+                local_response.append(
+                    {
+                        "IdPlaca_FK": 999,
+                        "Aseguradora": _n[0],
+                        "FechaInicio": _n[2],
+                        "FechaHasta": _n[3],
+                        "PlacaValidate": _n[4],
+                        "Certificado": _n[5],
+                        "Uso": _n[6],
+                        "Clase": _n[7],
+                        "Vigencia": _n[1],
+                        "Tipo": _n[8],
+                        "FechaVenta": _n[9],
+                        "ImageBytes": create_certificate(data=copy(_n)),
+                        "LastUpdate": dt.now().strftime("%Y-%m-%d"),
+                    }
+                )
 
-        # if code gets here, means scraping has encountred three consecutive errors, skip record
-        dash.log(card=CARD, msg=f"|ERROR| No se pudo procesar {placa}.")
+            # calcular ETA aproximado
+            procesados += 1
+            duracion_promedio = (time.perf_counter() - tiempo_inicio) / procesados
+            eta = dt.now() + td(
+                seconds=duracion_promedio
+                * (queue_update_data.qsize() // GATHER_ITERATIONS)
+            )
+
+            # actualizar dashboard
+            dash.log(
+                card=card,
+                title=f"Soat ({subthread}) [Pendientes: {queue_update_data.qsize()//GATHER_ITERATIONS}]",
+                lastUpdate=f"ETA: {str(eta).split('.')[0]}",
+            )
+            dash.log(action=f"[ SOATS ] {_n[2]}")
+
+        except KeyboardInterrupt:
+            quit()
+
+        except Exception as e:
+            dash.log(card=card, text=f"Crash (Gather): {e}", status=2)
 
     # log last action and close webdriver
     dash.log(
-        card=CARD,
+        card=card,
         title="Certificados Soat",
-        progress=0,
+        progress=100,
         status=3,
         text="Inactivo",
         lastUpdate=dt.now(),

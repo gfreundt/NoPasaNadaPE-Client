@@ -10,9 +10,8 @@ from src.utils.constants import HEADLESS
 
 def browser(doc_num):
 
-    webdriver = ChromeUtils().init_driver(
-        headless=HEADLESS["osiptel"], verbose=False, maximized=True
-    )
+    chromedriver = ChromeUtils(headless=HEADLESS["osiptel"], window_size=(1920, 1080))
+    webdriver = chromedriver.direct_driver()
 
     while True:
 
@@ -28,7 +27,7 @@ def browser(doc_num):
         btn = webdriver.find_element(By.ID, "btnBuscar")
         time.sleep(1)
         webdriver.execute_script("arguments[0].click();", btn)
-        time.sleep(3)
+        time.sleep(2)
 
         result = []
         for i in range(1, 6):

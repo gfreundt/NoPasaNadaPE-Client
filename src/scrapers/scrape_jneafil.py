@@ -7,9 +7,9 @@ from src.utils.constants import HEADLESS
 
 
 def browser(doc_num):
-    webdriver = ChromeUtils().init_driver(
-        headless=HEADLESS["jneafil"], verbose=False, maximized=True
-    )
+    chromedriver = ChromeUtils(headless=HEADLESS["jneafil"], maximized=True)
+    webdriver = chromedriver.direct_driver()
+
     webdriver.get("https://sroppublico.jne.gob.pe/Consulta/Afiliado")
     time.sleep(1.5)
 

@@ -15,7 +15,7 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
         card=CARD,
         title=f"Sunat [{total_original}]",
         status=1,
-        progress=100,
+        progress=0,
         text="Inicializando",
         lastUpdate="Actualizado:",
     )
@@ -44,7 +44,10 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
                 # update dashboard with progress and last update timestamp
                 dash.log(
                     card=CARD,
-                    progress=int((queue_update_data.qsize() / total_original) * 100),
+                    progress=int(
+                        ((total_original - queue_update_data.qsize()) / total_original)
+                        * 100
+                    ),
                     lastUpdate=dt.now(),
                 )
 
@@ -107,7 +110,7 @@ def gather(dash, queue_update_data, local_response, total_original, lock):
     dash.log(
         card=CARD,
         title="Sunat",
-        progress=0,
+        progress=100,
         status=3,
         text="Inactivo",
         lastUpdate=dt.now(),

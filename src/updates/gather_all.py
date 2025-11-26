@@ -14,12 +14,12 @@ from src.updates import (
     gather_satimps,
     gather_recvehic,
     gather_sunarps,
-    gather_soats,
     gather_satmuls,
     gather_sunats,
     gather_osipteles,
     gather_jnemultas,
     gather_jneafils,
+    gather_soats,
 )
 
 # TODO: find a jnemultas with actual multas
@@ -34,17 +34,36 @@ def gather_threads(dash, all_updates):
     full_response = {}
     atexit.register(update_local_gather_file, full_response)
 
-    # ----- execute ALONE, wait end to start next gather
+    # records vehiculares
+    if all_updates.get("recvehic"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["recvehic"],
+                    full_response,
+                    gather_recvehic,
+                    "DataMtcRecordsConductores",
+                    1,
+                ),
+            )
+        )
 
     # brevetes
     if all_updates.get("brevetes"):
-        gather_brevetes.gather(dash, all_updates["brevetes"], full_response)
-
-    # soat (only if change of VPN needed)
-    if len(all_updates["soats"]) > 12:
-        gather_soats.gather(dash, all_updates["soats"], full_response)
-
-    # ----- execute NO HEADLESS no sub-threads (requires user clicking on captcha)
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    all_updates["brevetes"],
+                    full_response,
+                    gather_brevetes,
+                    "DataMtcBrevetes",
+                ),
+            )
+        )
 
     # multas sat
     if all_updates.get("satmuls"):
@@ -54,8 +73,6 @@ def gather_threads(dash, all_updates):
                 args=(dash, all_updates["satmuls"], full_response),
             )
         )
-
-    # ----- execute HEADLESS with sub-threads
 
     # revisiones tecnicas
     if all_updates.get("revtecs"):
@@ -93,21 +110,6 @@ def gather_threads(dash, all_updates):
             Thread(
                 target=gather_satimps.manage_sub_threads,
                 args=(dash, all_updates["satimps"], full_response),
-            )
-        )
-
-    # record de conductores
-    if all_updates.get("recvehic"):
-        all_threads.append(
-            Thread(
-                target=manage_sub_threads,
-                args=(
-                    dash,
-                    all_updates["recvehic"],
-                    full_response,
-                    gather_recvehic,
-                    "DataMtcRecordsConductores",
-                ),
             )
         )
 
@@ -186,8 +188,8 @@ def gather_threads(dash, all_updates):
             )
         )
 
-    # soat (only if no need to change VPN)
-    if 0 < len(all_updates["soats"]) <= 12:
+    # soat
+    if all_updates.get("soats"):
         all_threads.append(
             Thread(
                 target=manage_sub_threads,
@@ -206,15 +208,14 @@ def gather_threads(dash, all_updates):
         thread.start()
         time.sleep(1.5)
 
-    # wait for all active threads to finish
+    # grabar cada 90 segundos lo que este en memoria de respuestas por si hay un error critico
+    # y mas adelante poder actualizar manualmente la respuesta parcial
     start_time = time.perf_counter()
-    while any([i.is_alive() for i in all_threads]):
-        time.sleep(5)
-
-        # update local gather file every 90 sec in case of fatal error get partial data
+    while any(t.is_alive() for t in all_threads):
+        time.sleep(10)
         if time.perf_counter() - start_time > 90:
-            start_time = time.perf_counter()
             update_local_gather_file(full_response)
+            start_time = time.perf_counter()
 
     # final log update
     dash.log(general_status=("Esperando", 2))
@@ -224,10 +225,13 @@ def gather_threads(dash, all_updates):
     return full_response
 
 
-def manage_sub_threads(dash, update_data, full_response, target_func, update_key):
+def manage_sub_threads(
+    dash, update_data, full_response, target_func, update_key, iterations=None
+):
 
     # create variable that accumulates all sub-thread responses
     local_response = []
+    full_response[update_key] = local_response
 
     # load queue with data that needs to be updated
     queue_update_data = queue.Queue()
@@ -237,15 +241,35 @@ def manage_sub_threads(dash, update_data, full_response, target_func, update_key
     # launch and join N sub-threads for the main thread
     lock = Lock()
     threads = []
-    for _ in range(GATHER_ITERATIONS):
+    for i in range(iterations or GATHER_ITERATIONS):
+        card = max(dash.assigned_cards) + 1 if dash.assigned_cards else 0
+        dash.assigned_cards.append(card)
         t = Thread(
             target=target_func.gather,
-            args=(dash, queue_update_data, local_response, len(update_data), lock),
+            args=(
+                dash,
+                queue_update_data,
+                local_response,
+                len(update_data),
+                lock,
+                card,
+                i,
+            ),
+            name=f"{target_func}-{i}",
         )
         t.start()
         threads.append(t)
-    for t in threads:
-        t.join()
+
+    # wait for all active threads to finish
+    start_time = time.perf_counter()
+    while any([i.is_alive() for i in threads]):
+        time.sleep(5)
+
+        # update local gather file every 90 sec in case of fatal error get partial data
+        if time.perf_counter() - start_time > 90:
+            start_time = time.perf_counter()
+            with lock:
+                update_local_gather_file(full_response)
 
     # put all respones into global collector variable
     full_response.update({update_key: local_response})
