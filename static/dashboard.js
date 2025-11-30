@@ -107,13 +107,13 @@ function updateDashboard() {
 
             // --- Update KPIs (Simplified and Consolidated) ---
             const kpiIds = [
-                'kpi-active-threads',
+                'kpi-nopasanadape-status',
                 'kpi-truecaptcha-balance',
                 'kpi-zeptomail-balance',
                 'kpi-twocaptcha-balance',
                 'kpi-brightdata-balance',
                 'kpi-googlecloud-balance',
-                'kpi-cloudfare-balance'
+                'kpi-cloudfare-status'
             ];
 
             kpiIds.forEach(id => {

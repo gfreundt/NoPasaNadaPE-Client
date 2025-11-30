@@ -21,7 +21,7 @@ from src.utils.constants import (
 )
 from src.updates import gather_all
 from src.test import tests
-from src.monitor import update_kpis, update_scraper_status
+from src.monitor import update_kpis
 
 from pprint import pprint
 

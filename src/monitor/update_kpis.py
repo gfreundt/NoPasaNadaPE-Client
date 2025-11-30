@@ -11,6 +11,19 @@ from src.utils.constants import (
 )
 
 
+def get_nopasanadape():
+    try:
+        url = "https://nopasanadape.com"
+        r = requests.get(url)
+        if r.status_code == 200:
+            return "✅ ONLINE"
+        else:
+            return "❌ PROBLEMAS"
+
+    except requests.exceptions.RequestException:
+        return "❓ N/A"
+
+
 def get_truecaptcha():
     try:
         url = rf"https://api.apiTruecaptcha.org/one/hello?method=get_all_user_data&userid=gabfre%40gmail.com&apikey={TRUECAPTCHA_API_KEY}"
@@ -25,8 +38,6 @@ def get_zeptomail():
 
 
 def get_brightdata():
-    return "❓ N/A"
-
     BALANCE_URL = "https://api.brightdata.com/balance"
     headers = {
         "Authorization": f"Bearer {BRIGHT_DATA_API_KEY}",
@@ -37,14 +48,13 @@ def get_brightdata():
         if response.status_code == 200:
             balance_data = response.json()
             balance = balance_data.get("balance")
-            currency = balance_data.get("currency")
-            if balance and currency:
-                return f"{currency} {balance}"
+            if balance:
+                return f"✅ USD {balance}"
 
-        return "N/A"
+        return "❓ N/A"
 
     except requests.exceptions.RequestException:
-        return "N/A"
+        return "❓ N/A"
 
 
 def get_googlecloud():
@@ -92,16 +102,35 @@ def get_2captcha():
 
 
 def get_cloudfare():
-    return "✅ ACTIVO"
+    status_api_url = "https://www.cloudflarestatus.com/api/v2/status.json"
+    try:
+        response = requests.get(status_api_url)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        status_data = response.json()
+        indicator = status_data.get("status", {}).get("indicator", "unknown")
+
+        if indicator in ["major", "critical"]:
+            return "❌ PROBLEMAS"
+            # Add your custom logic here (e.g., switch to a backup server)
+        elif indicator == "minor":
+            return "⚠️ INESTABLE"
+        elif indicator is not None:
+            return "✅ ACTIVO"
+        else:
+            return "❓ N/A"
+
+    except requests.exceptions.RequestException:
+        return "❓ N/A"
 
 
 def main():
 
     return {
+        "kpi_nopasanadape_status": get_nopasanadape(),
         "kpi_truecaptcha_balance": get_truecaptcha(),
         "kpi_zeptomail_balance": get_zeptomail(),
         "kpi_brightdata_balance": get_brightdata(),
         "kpi_twocaptcha_balance": get_2captcha(),
         "kpi_googlecloud_balance": get_googlecloud(),
-        "kpi_cloudfare_balance": get_cloudfare(),
+        "kpi_cloudfare_status": get_cloudfare(),
     }
