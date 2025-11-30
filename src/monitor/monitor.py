@@ -10,8 +10,9 @@ import subprocess
 import json
 from collections import deque
 import time
-from src.monitor import auto_scraper
-from src.utils.utils import get_local_ip
+from src.monitor import settings, auto_scraper
+from src.utils import maintenance
+from src.utils.utils import get_local_ip, check_vpn_online
 from src.utils.constants import (
     NETWORK_PATH,
     UPDATER_TOKEN,
@@ -20,6 +21,7 @@ from src.utils.constants import (
 )
 from src.updates import gather_all
 from src.test import tests
+from src.monitor import update_kpis, update_scraper_status
 
 from pprint import pprint
 
@@ -85,107 +87,10 @@ class Dashboard:
         self.thread_monitor.start()
         self.assigned_cards = []
 
-        # Define routes
-        self.app.add_url_rule("/", endpoint="/", view_func=self.dashboard)
-        self.app.add_url_rule("/data", "get_data", self.get_data)
-        self.app.add_url_rule("/log/get", "log_get", self.log_get)
-
-        self.app.add_url_rule(
-            "/datos_alertas",
-            endpoint="actualizar_alerta",
-            view_func=self.actualizar_alerta,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/datos_boletines",
-            endpoint="actualizar_boletin",
-            view_func=self.actualizar_boletin,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/actualizar",
-            endpoint="actualizar",
-            view_func=self.actualizar,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/generar_mensajes",
-            endpoint="crear_mensajes",
-            view_func=self.crear_mensajes,
-            methods=["POST"],
-        )
-
-        self.app.add_url_rule(
-            "/enviar_mensajes",
-            endpoint="enviar_mensajes",
-            view_func=self.enviar_mensajes,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/test",
-            endpoint="test",
-            view_func=self.hacer_tests,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/logs",
-            endpoint="logs",
-            view_func=self.actualizar_logs,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/db_info",
-            endpoint="db_info",
-            view_func=self.db_info,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/db_backup",
-            endpoint="db_backup",
-            view_func=self.db_backup,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/actualizar_de_json",
-            endpoint="actualizar_de_json",
-            view_func=self.actualizar_de_json,
-            methods=["POST"],
-        )
-        self.app.add_url_rule(
-            "/auto_scraper",
-            endpoint="auto_scraper",
-            view_func=self.auto_scraper,
-            methods=["GET", "POST"],
-        )
+        # definir rutas de flask
+        settings.set_routes(self)
 
         self.set_initial_data()
-        self.update_kpis()
-
-    def dashboard(self):
-        return render_template("dashboard.html")
-
-    def log(self, **kwargs):
-        if "general_status" in kwargs:
-            self.data["top_right"]["content"] = kwargs["general_status"][0]
-            self.data["top_right"]["status"] = kwargs["general_status"][1]
-            # write to permanent log in database
-        if "action" in kwargs:
-            _ft = f"{dt.now():%Y-%m-%d %H:%M:%S} > {kwargs["action"]}"
-            self.log_entries.append(_ft)
-            self.data["bottom_left"].append(_ft[:140])
-        if "card" in kwargs:
-            for field in kwargs:
-                if field == "card":
-                    continue
-                self.data["cards"][kwargs["card"]][field] = kwargs[field]
-        if "usuario" in kwargs:
-            _ft = f"<b>{dt.now():%Y-%m-%d %H:%M:%S} ></b>{kwargs["usuario"]}"
-            self.data["bottom_left"].append(_ft[:140])
-            if len(self.data["bottom_left"]) > 30:
-                self.data["bottom_left"].pop(0)
-            # write to permanent log in database
-
-        # any time there is an action, update kpis
         self.update_kpis()
 
     def set_initial_data(self):
@@ -205,65 +110,80 @@ class Dashboard:
             "bottom_right": [],
         }
 
+    def log(self, **kwargs):
+        if "general_status" in kwargs:
+            self.data["top_right"]["content"] = kwargs["general_status"][0]
+            self.data["top_right"]["status"] = kwargs["general_status"][1]
+            # write to permanent log in database
+
+        if "action" in kwargs:
+            _ft = f"{dt.now():%Y-%m-%d %H:%M:%S} > {kwargs["action"]}"
+            self.log_entries.append(_ft)
+            self.data["bottom_left"].append(_ft[:140])
+
+        if "card" in kwargs:
+            for field in kwargs:
+                if field == "card":
+                    continue
+                self.data["cards"][kwargs["card"]][field] = kwargs[field]
+
+        if "usuario" in kwargs:
+            _ft = f"<b>{dt.now():%Y-%m-%d %H:%M:%S} ></b>{kwargs["usuario"]}"
+            self.data["bottom_left"].append(_ft[:140])
+            if len(self.data["bottom_left"]) > 30:
+                self.data["bottom_left"].pop(0)
+
+        # any time there is an action, update kpis
+        self.update_kpis()
+
     def update_kpis(self):
-        # get number of users
-        # self.db.cursor.execute("SELECT COUNT( ) FROM members")
-        # self.data.update({"kpi_members": self.db.cursor.fetchone()[0]})
+        """
+        actualiza informacion de vigencia/saldo de servicios de terceros
+        """
+        kpis = update_kpis.main()
+        self.data.update(kpis)
+        # status = update_scraper_status.main(self.das)
+        # self.data.update(status)
 
-        # # get number of placas
-        # self.db.cursor.execute("SELECT COUNT( ) FROM placas")
-        # self.data.update({"kpi_placas": self.db.cursor.fetchone()[0]})
+    # -------- ACCION DE URL DE INGRESO --------
+    def dashboard(self):
+        return render_template("dashboard.html")
 
-        # get balance left in truecaptcha
-        try:
-            url = r"https://api.apiTruecaptcha.org/one/hello?method=get_all_user_data&userid=gabfre%40gmail.com&apikey=UEJgzM79VWFZh6MpOJgh"
-            r = requests.get(url)
-            self.data.update(
-                {
-                    "kpi_truecaptcha_balance": f'USD {r.json()["data"]["get_user_info"][4][
-                        "value"
-                    ]}'
-                }
-            )
-        except ConnectionError:
-            self.data.update({"kpi_truecaptcha_balance": "N/A"})
-
-        self.data.update({"kpi_zeptomail_balance": "N/A"})
+    # ------- ACCIONES DE APIS (INTERNO) -------
+    def auto_scraper(self):
+        print(f"********* AUTOSCRAPER TRIGGERED {dt.now()}")
+        self.auto_scraper_continue_flag = True
+        auto_scraper.main(self)
+        return redirect("/")
 
     def get_data(self):
-        import random
-
-        self.data.update({"kpi_active_threads": len(self.thread_monitor.user_threads)})
-        self.data.update({"kpi_twocaptcha_balance": random.randrange(99)})
-        self.data.update({"kpi_brightdata_balance": random.randrange(99)})
-        self.data.update({"kpi_googlecloud_balance": random.randrange(99)})
-        self.data.update({"kpi_cloudfare_balance": 0})
-
+        """
+        endpoint for dashboard to update continually on dashboard information:
+        sends back a dictionary (self.data)
+        """
         with self.data_lock:
             return jsonify(self.data)
 
-    def actualizar_alerta(self):
+    # -------- ACCIONES DE BOTONES ----------
+    def datos_alerta(self):
         _json = {
             "token": UPDATER_TOKEN,
-            "instruction": "actualizar_alerta",
+            "instruction": "datos_alerta",
         }
         self.actualizar_datos = requests.post(url=self.url, json=_json)
-        _msg = "ALERTA: " + " ".join(
+        _msg = "[ DATOS ALERTA ] " + " ".join(
             [f"{i}: {len(j)}" for i, j in self.actualizar_datos.json().items()]
         )
         self.log(action=_msg)
-
-        print(self.actualizar_datos.json())
-
         return redirect("/")
 
-    def actualizar_boletin(self):
+    def datos_boletin(self):
         _json = {
             "token": UPDATER_TOKEN,
-            "instruction": "actualizar_boletin",
+            "instruction": "datos_boletin",
         }
         self.actualizar_datos = requests.post(url=self.url, json=_json)
-        _msg = "BOLETIN: " + " ".join(
+        _msg = "[ DATOS BOLETIN ] " + " ".join(
             [f"{i[:4]}={len(j)}" for i, j in self.actualizar_datos.json().items()]
         )
         self.log(action=_msg)
@@ -271,17 +191,27 @@ class Dashboard:
         return redirect("/")
 
     def actualizar(self):
+
+        # detener si VPN no esta en linea
+        if not check_vpn_online():
+            self.log(
+                action="[ ACTUALIZACION ] ERROR - VPN no esta en linea.",
+            )
+            # cambiar flag para detener autoscraper si solicitud de actualizar vino de ahi
+            self.auto_scraper_continue_flag = True
+
+            return redirect("/")
+
         if not hasattr(self, "actualizar_datos"):
-            self.log(action="ACTUALIZAR: ERROR - Correr Registros Pendientes Antes")
+            self.log(
+                action="[ ACTUALIZACION ] ERROR - Correr Registros Pendientes Antes"
+            )
         else:
-            self.log(action="ACTUALIZAR: En proceso")
+            self.log(action="[ ACTUALIZACION ] En proceso")
 
             scraper_responses = gather_all.gather_threads(
                 dash=self, all_updates=self.actualizar_datos.json()
             )
-            with open("latest_update.json", "w") as outfile:
-                outfile.write(json.dumps(scraper_responses))
-
             _json = {
                 "token": UPDATER_TOKEN,
                 "instruction": "do_updates",
@@ -290,42 +220,70 @@ class Dashboard:
             server_response = requests.post(url=self.url, json=_json)
             if server_response.status_code == 200:
                 self.log(
-                    action=f"ACTUALIZAR: Completo - Envio: {len(json.dumps(scraper_responses).encode("utf-8")) / 1024 / 1024:.2f} MB",
+                    action=f"[ ACTUALIZACION ] Tamaño: {len(json.dumps(scraper_responses).encode("utf-8")) / 1024:.3f} kB",
                 )
             else:
                 self.log(action=f"[ERROR] Actualizacion: {server_response.status_code}")
 
-            # borrar informacion de datos para actualizar, obliga a actualizarlos
+            # borrar informacion de datos para actualizar, obliga a actualizarlos otra vez
             delattr(self, "actualizar_datos")
 
         return redirect("/")
 
-    def crear_mensajes(self):
-        # Borrar todos los mensajes antiguos
-        for i in os.listdir(os.path.join(NETWORK_PATH, "outbound")):
-            os.remove(os.path.join(NETWORK_PATH, "outbound", i))
+    def generar_alertas(self):
 
+        # borrar todos los mensajes antiguos
+        maintenance.clear_outbound_folder(tipo="alertas")
+
+        # dar comando al servidor
         _json = {
             "token": UPDATER_TOKEN,
-            "instruction": "create_messages",
+            "instruction": "generar_alertas",
         }
-        created_messages = requests.post(url=self.url, json=_json).json()
-        for i in created_messages:
-            with open(
-                os.path.join(NETWORK_PATH, "outbound", i), "w", encoding="utf-8"
-            ) as outfile:
-                outfile.write(created_messages[i])
-        self.log(action=f"[CREAR MENSAJES] Mensajes Creados: {len(created_messages)}")
+        self.created_messages = requests.post(url=self.url, json=_json).json()
 
+        # grabar copia local de los mensjes generados por el servidor
+        for secuencial, texto in enumerate(self.created_messages, start=1):
+            with open(
+                os.path.join(NETWORK_PATH, "outbound", f"alerta-{secuencial:04d}.html"),
+                "w",
+                encoding="utf-8",
+            ) as outfile:
+                outfile.write(texto)
+        self.log(
+            action=f"[ CREAR MENSAJES ] Mensajes Creados: {len(self.created_messages)}"
+        )
+
+        # mantenerse en la misma pagina
         return redirect("/")
 
-    def rp_act_cm(self):
-        return
-        self.registros_pendientes()
-        time.sleep(3)
-        self.actualizar()
-        time.sleep(3)
-        self.crear_mensajes()
+    def generar_boletines(self):
+
+        # borrar todos los mensajes antiguos
+        maintenance.clear_outbound_folder(tipo="boletines")
+
+        # dar comando al servidor
+        _json = {
+            "token": UPDATER_TOKEN,
+            "instruction": "generar_boletines",
+        }
+        self.created_messages = requests.post(url=self.url, json=_json).json()
+
+        # grabar copia local de los mensjes generados por el servidor
+        for secuencial, texto in enumerate(self.created_messages, start=1):
+            with open(
+                os.path.join(
+                    NETWORK_PATH, "outbound", f"boletin-{secuencial:04d}.html"
+                ),
+                "w",
+                encoding="utf-8",
+            ) as outfile:
+                outfile.write(texto)
+        self.log(
+            action=f"[ CREAR MENSAJES ] Mensajes Creados: {len(self.created_messages)}"
+        )
+
+        # mantenerse en la misma pagina
         return redirect("/")
 
     def enviar_mensajes(self):
@@ -422,10 +380,6 @@ class Dashboard:
             )
         return redirect("/")
 
-    def auto_scraper(self):
-        print(f"********* AUTOSCRAPER TRIGGERED {dt.now()}")
-        return auto_scraper.main(self)
-
     def log_get(self):
         return jsonify(log="\n".join(self.log_entries))
 
@@ -437,8 +391,3 @@ class Dashboard:
     def runx(self):
         print(f"MONITOR RUNNING ON: http://{get_local_ip()}:7400")
         self.app.run(debug=False, threaded=True, host="0.0.0.0", port=7400)
-
-
-if __name__ == "__main__":
-    app_instance = Dashboard(db=None)
-    app_instance.run()

@@ -1,107 +1,149 @@
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as td
 from queue import Empty
+import time
 
 # local imports
 from src.scrapers import scrape_sunarp
+from src.utils.constants import HEADLESS
+from src.utils.webdriver import ChromeUtils
 
 
-def gather(dash, queue_update_data, local_response, total_original, lock):
+def gather(
+    dash, queue_update_data, local_response, total_original, lock, card, subthread
+):
 
-    CARD = 6
-
-    # log first action
-    dash.log(
-        card=CARD,
-        title=f"Fichas Sunarp [{total_original}]",
-        status=1,
-        progress=100,
-        text="Inicializando",
-        lastUpdate="Actualizado:",
+    # construir webdriver con parametros especificos
+    chromedriver = ChromeUtils(
+        headless=HEADLESS["sunarp"],
+        incognito=True,
+        window_size=(1920, 1080),
     )
+    # webdriver = chromedriver.proxy_driver()
+    webdriver = chromedriver.direct_driver()
+
+    # iniciar variables para calculo de ETA
+    tiempo_inicio = time.perf_counter()
+    procesados = 0
+    eta = 0
 
     # iterate on all records that require updating and get scraper results
-    while not queue_update_data.empty():
+    while True:
 
-        # grab next record from update queue unless empty
+        # intentar extraer siguiente registro de cola compartida
         try:
-            placa = queue_update_data.get_nowait()
+            record_item = queue_update_data.get_nowait()
+            placa = record_item
+
         except Empty:
+            # log de salida del scraper
+            dash.log(
+                card=card,
+                status=3,
+                title=f"SUNARPS-{subthread} [PROCESADOS: {procesados}]",
+                text="Inactivo",
+                lastUpdate=f"Fin: {dt.strftime(dt.now(),"%H:%M:%S")}",
+            )
             break
 
-        retry_attempts = 0
-        # loop to catch scraper errors and retry limited times
-        while retry_attempts < 3:
-            try:
-                # log action
-                dash.log(card=CARD, text=f"Procesando: {placa}")
+        try:
+            # log action
+            dash.log(
+                card=card,
+                title=f"SUNARPS-{subthread} [Pendientes: {total_original}]",
+                status=1,
+                text=f"Procesando: {placa}",
+                lastUpdate=f"ETA: {eta}",
+            )
 
-                # send request to scraper
-                image_bytes = scrape_sunarp.browser(placa=placa)
+            # send request to scraper
+            scraper_response = scrape_sunarp.browser_wrapper(
+                placa=placa, webdriver=webdriver
+            )
+            procesados += 1
 
-                # update dashboard with progress and last update timestamp
-                dash.log(
-                    card=CARD,
-                    progress=int((queue_update_data.qsize() / total_original) * 100),
-                    lastUpdate=dt.now(),
-                )
+            # si respuesta es texto, hubo un error -- regresar
+            if isinstance(scraper_response, str) and len(scraper_response) < 100:
+                dash.log(card=card, status=2, lastUpdate=f"ERROR: {scraper_response}")
+                # devolver registro a la cola para que otro thread lo complete
+                if record_item is not None:
+                    queue_update_data.put(record_item)
 
-                # correct captcha, no image for placa - next placa
-                if not image_bytes:
-                    break
+                # si error permite reinicio ("@") esperar 10 segundos y empezar otra vez
+                if "@" in scraper_response:
+                    dash.log(
+                        card=card,
+                        text="Reinicio en 10 segundos",
+                        status=1,
+                    )
+                    time.sleep(10)
+                    continue
 
-                _now = dt.now().strftime("%Y-%m-%d")
+                # si error no permite reinicio, salir
+                break
 
-                # add foreign key and current date to response
+            # respuesta es en blanco
+            if not scraper_response:
                 with lock:
                     local_response.append(
                         {
-                            "IdPlaca_FK": 999,
+                            "Empty": True,
                             "PlacaValidate": placa,
-                            "Serie": "",
-                            "VIN": "",
-                            "Motor": "",
-                            "Color": "",
-                            "Marca": "",
-                            "Modelo": "",
-                            "Ano": "",
-                            "PlacaVigente": "",
-                            "PlacaAnterior": "",
-                            "Estado": "",
-                            "Anotaciones": "",
-                            "Sede": "",
-                            "Propietarios": "",
-                            "ImageBytes": image_bytes,
-                            "LastUpdate": _now,
                         }
                     )
+                dash.log(action=f"[ SUNARPS ] {placa}")
+                continue
 
-                # skip to next record
-                break
+            _now = dt.now().strftime("%Y-%m-%d")
 
-            except KeyboardInterrupt:
-                quit()
-
-            except Exception:
-                retry_attempts += 1
-                dash.log(
-                    card=CARD,
-                    text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {placa}",
+            # add foreign key and current date to response
+            with lock:
+                local_response.append(
+                    {
+                        "IdPlaca_FK": 999,
+                        "PlacaValidate": placa,
+                        "Serie": "",
+                        "VIN": "",
+                        "Motor": "",
+                        "Color": "",
+                        "Marca": "",
+                        "Modelo": "",
+                        "Ano": "",
+                        "PlacaVigente": "",
+                        "PlacaAnterior": "",
+                        "Estado": "",
+                        "Anotaciones": "",
+                        "Sede": "",
+                        "Propietarios": "",
+                        "ImageBytes": scraper_response,
+                        "LastUpdate": _now,
+                    }
                 )
 
-        # if code gets here, means scraping has encountred three consecutive errors, skip record
-        dash.log(card=CARD, msg=f"|ERROR| No se pudo procesar {placa}.")
+            # calcular ETA aproximado
+            duracion_promedio = (time.perf_counter() - tiempo_inicio) / procesados
+            eta = dt.strftime(
+                dt.now()
+                + td(seconds=duracion_promedio * (total_original - procesados)),
+                "%H:%M:%S",
+            )
 
-    # log last action
-    dash.log(
-        card=CARD,
-        title="Fichas Sunarp",
-        status=3,
-        progress=0,
-        text="Inactivo",
-        lastUpdate=dt.now(),
-    )
+            dash.log(action=f"[ SOATS ] {placa}")
 
+        except KeyboardInterrupt:
+            quit()
 
-# TODO: move to post-processing
-def extract_data_from_image(img_filename):
-    return [""] * 13
+        except Exception as e:
+            # devolver registro a la cola para que otro thread lo complete
+            if record_item is not None:
+                queue_update_data.put(record_item)
+
+            # actualizar dashboard
+            dash.log(
+                card=card,
+                text=f"Crash (Gather): {str(e)[:55]}",
+                status=2,
+            )
+            break
+
+    # cerrar el driver antes de volver
+    webdriver.quit()

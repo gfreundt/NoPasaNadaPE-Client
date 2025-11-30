@@ -4,43 +4,66 @@ import base64
 
 # import pyautogui
 import time
-from pathlib import Path
+from func_timeout import func_set_timeout, exceptions
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException
 from src.utils.utils import use_truecaptcha
-from src.utils.constants import NETWORK_PATH
+from src.utils.constants import NETWORK_PATH, SCRAPER_TIMEOUT
 
 
-def browser(doc_num, webdriver):
+@func_set_timeout(SCRAPER_TIMEOUT["revtec"])
+def browser_wrapper(doc_num, webdriver, lock):
+    try:
+        return browser(doc_num, webdriver, lock)
+    except exceptions.FunctionTimedOut:
+        return "Timeout"
 
-    # get paths to Downloads folder and destination folder
-    target_folder = Path(os.path.join(NETWORK_PATH, "static"))
 
-    for file_path in target_folder.glob("RECORD*.pdf"):
-        file_path.unlink()
+def browser(doc_num, webdriver, lock):
 
-    # start browser, navigate to url
     url = "https://recordconductor.mtc.gob.pe/"
 
-    webdriver.get(url)
-    time.sleep(2)
+    intentos_captcha = 0
+    while intentos_captcha < 5:
 
-    # outer loop: in case captcha is not accepted by webpage, try with a new one
-    while True:
+        # abrir url
+        if webdriver.current_url != url:
+            webdriver.get(url)
+            time.sleep(2)
+
         try:
             # extraer texto de captcha
             _captcha_file_like = io.BytesIO(
                 webdriver.find_element(By.ID, "idxcaptcha").screenshot_as_png
             )
             captcha_txt = use_truecaptcha(_captcha_file_like)["result"]
+            if not captcha_txt:
+                return "Servicio Captcha Offline."
 
             # ingresar en formulario y apretar buscar
-            webdriver.find_element(By.ID, "txtNroDocumento").send_keys(doc_num)
+            try:
+                t = WebDriverWait(webdriver, 7).until(
+                    EC.visibility_of_element_located((By.ID, "txtNroDocumento"))
+                )
+                t.send_keys(doc_num)
+            except TimeoutException:
+                return "Campo no puede interactuar"
+
             webdriver.find_element(By.ID, "idCaptcha").send_keys(captcha_txt)
             time.sleep(1)
-            webdriver.find_element(By.ID, "BtnBuscar").click()
-            time.sleep(3)
 
-            # mensaje de limite de consultas - dormir
+            # esperar a que boton se pueda presionar
+            try:
+                b = WebDriverWait(webdriver, 7).until(
+                    EC.element_to_be_clickable((By.ID, "BtnBuscar"))
+                )
+                b.click()
+            except TimeoutException:
+                return "Boton no se puede presionar"
+
+            time.sleep(3)
 
             # obtener mensaje de alerta (si hay)
             _alerta = webdriver.find_elements(
@@ -49,77 +72,72 @@ def browser(doc_num, webdriver):
 
             # mensaje de alerta: captcha equivocado
             if _alerta and "ingresado" in _alerta[0].text:
+                # refrescar captcha (presionar boton) para siguiente iteracion
                 webdriver.refresh()
+                intentos_captcha += 1
                 time.sleep(3)
                 continue
 
             # mensaje de alerta: no hay informacion de la persona
             elif _alerta and "PERSONA" in _alerta[0].text:
-                webdriver.quit()
-                return -1
-
-            # no hay alerta - proceder
-            break
+                return []
 
         except ValueError:
-            # no cargo imagen de captcha, refrescar y volver a intentar
+            # no carga imagen de captcha, refrescar pagina y volver a intentar
             webdriver.refresh()
+            intentos_captcha += 1
             time.sleep(3)
+            return "No Carga Captcha"
 
-    # click on download button
-    webdriver.execute_cdp_cmd(
-        "Page.setDownloadBehavior",
-        {
-            "behavior": "allow",
-            "downloadPath": os.path.join(NETWORK_PATH, "static"),
-        },
-    )
-    b = webdriver.find_elements(By.ID, "btnprint")
-    try:
-        webdriver.execute_script("arguments[0].click();", b[0])
-        time.sleep(2)
+        # inicia extraccion de datos
 
-    except Exception:
-        webdriver.quit()
-        return "No Hay Boton Download"
+        # parametros necesarios para que no abra ventana de dialogo de "Guardar Como..."
+        webdriver.execute_cdp_cmd(
+            "Page.setDownloadBehavior",
+            {
+                "behavior": "allow",
+                "downloadPath": os.path.join(NETWORK_PATH, "static"),
+            },
+        )
 
-    if os.path.isfile(
-        os.path.join(NETWORK_PATH, "static", "RECORD DE CONDUCTOR (2).pdf")
-    ):
-        return "Multiples archivos de PDF."
+        # apretar boton que lleva a bajar archivo
+        b = webdriver.find_elements(By.ID, "btnprint")
+        with lock:
+            try:
+                webdriver.execute_script("arguments[0].click();", b[0])
+                time.sleep(2)
 
-    # esperar un maximo de 12 segundos hasta que baje el archivo y retornar imagen
-    start_time = time.time()
-    _file = os.path.join(NETWORK_PATH, "static", "RECORD DE CONDUCTOR.pdf")
-    while time.time() - start_time < 12:
-        if os.path.isfile(_file):
-            with open(_file, "rb") as f:
-                webdriver.quit()
-                return base64.b64encode(f.read()).decode("utf-8")
-        time.sleep(0.5)
+            except Exception:
+                webdriver.refresh()
+                return "@No Hay Boton Download"
 
-    # si no se encontro imagen, retornar error
-    webdriver.quit()
-    return "No Se Puedo Bajar Archivo"
+            # si ha bajado un archivo copia porque no se borro el anterior generar error
+            if os.path.isfile(
+                os.path.join(NETWORK_PATH, "static", "RECORD DE CONDUCTOR (2).pdf")
+            ):
+                return "Multiples archivos de PDF."
 
+            # esperar un tiempo hasta que baje el archivo
+            start_time = time.time()
+            _file = os.path.join(NETWORK_PATH, "static", "RECORD DE CONDUCTOR.pdf")
+            while time.time() - start_time < 12:
 
-# def click_save_button_if_present(MAX_WAIT_TIME=5):
+                if os.path.isfile(_file):
 
-#     IMAGE_PATH = os.path.join(NETWORK_PATH, "static", "save_button.png")
-#     start_time = time.time()
+                    # refrescar captcha (presionar boton) para siguiente iteracion
+                    b = webdriver.find_element(By.ID, "idxRefreshCapcha")
+                    webdriver.execute_script("arguments[0].click();", b)
 
-#     while time.time() - start_time < MAX_WAIT_TIME:
-#         try:
-#             button_location = pyautogui.locateCenterOnScreen(
-#                 IMAGE_PATH, confidence=0.85
-#             )
-#             pyautogui.click(button_location)
+                    # borrar download y devolver la imagen en bytes
+                    with open(_file, "rb") as f:
+                        data = base64.b64encode(f.read()).decode("utf-8")
+                    os.remove(_file)
+                    return data
 
-#             # boton encontrado
-#             return True
+                time.sleep(1)
 
-#         except pyautogui.ImageNotFoundException:
-#             time.sleep(0.5)
+            # si no se encontro imagen, retornar error
+            return "@No Se Puedo Bajar Archivo"
 
-#     # nunca encontro el boton
-#     return False
+    # demasiados intentos de captcha errados consecutivos
+    return "Excede Intentos de Captcha"

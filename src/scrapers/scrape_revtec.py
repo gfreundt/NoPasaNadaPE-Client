@@ -18,52 +18,54 @@ def browser_wrapper(placa, webdriver):
 
 def browser(placa, webdriver):
 
+    url = "https://rec.mtc.gob.pe/Citv/ArConsultaCitv"
+
     intentos_captcha = 0
     while intentos_captcha < 5:
 
         # abrir url
-        url = "https://rec.mtc.gob.pe/Citv/ArConsultaCitv"
         if webdriver.current_url != url:
             webdriver.get(url)
             time.sleep(2)
 
-        while True:
-            # resolver captcha
-            captcha_txt = ""
-            while not captcha_txt:
-                _captcha_img = webdriver.find_element(By.ID, "imgCaptcha")
-                _img = io.BytesIO(_captcha_img.screenshot_as_png)
-                captcha_txt = use_truecaptcha(_img)["result"]
+        # resolver captcha
+        captcha_txt = ""
+        while not captcha_txt:
+            _captcha_img = webdriver.find_element(By.ID, "imgCaptcha")
+            _img = io.BytesIO(_captcha_img.screenshot_as_png)
+            captcha_txt = use_truecaptcha(_img)["result"]
+            if not captcha_txt:
+                return "Servicio Captcha Offline."
 
-            # ingresar placa, texto de captcha y apretar boton buscar
-            campo_placa = webdriver.find_element(By.ID, "texFiltro")
-            campo_placa.clear()
-            campo_placa.send_keys(placa)
-            time.sleep(0.5)
-            webdriver.find_element(By.ID, "texCaptcha").send_keys(captcha_txt)
-            time.sleep(0.5)
-            webdriver.find_element(By.ID, "btnBuscar").click()
-            time.sleep(1)
+        # ingresar placa, texto de captcha y apretar boton buscar
+        campo_placa = webdriver.find_element(By.ID, "texFiltro")
+        campo_placa.clear()
+        campo_placa.send_keys(placa)
+        time.sleep(0.5)
+        webdriver.find_element(By.ID, "texCaptcha").send_keys(captcha_txt)
+        time.sleep(0.5)
+        webdriver.find_element(By.ID, "btnBuscar").click()
+        time.sleep(1)
 
-            # ver si salio una alerta
-            try:
-                alert = webdriver.switch_to.alert
+        # ver si salio una alerta
+        try:
+            alert = webdriver.switch_to.alert
 
-                # captcha equivocado - click y tratar con nuevo captcha
-                if "no es" in alert.text:
-                    alert.accept()
-                    time.sleep(1)
-                    intentos_captcha += 1
-                    continue
+            # captcha equivocado - click y tratar con nuevo captcha
+            if "no es" in alert.text:
+                alert.accept()
+                time.sleep(1)
+                intentos_captcha += 1
+                continue
 
-                # no hay informacion de placa
-                if "No se" in alert.text:
-                    alert.accept()
-                    return []
+            # no hay informacion de placa
+            if "No se" in alert.text:
+                alert.accept()
+                return []
 
-            # no hay alerta, capturar datos
-            except NoAlertPresentException:
-                break
+        # no hay alerta, capturar datos
+        except NoAlertPresentException:
+            pass
 
         # extraer datos de resultados de web
         response = []

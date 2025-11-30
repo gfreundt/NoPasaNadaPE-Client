@@ -1,90 +1,134 @@
-from src.utils.constants import NETWORK_PATH, UPDATER_TOKEN, SERVER_IP, SERVER_IP_TEST
-from src.updates import gather_all
-import requests
-from flask import jsonify, redirect
-import time, json, os
+from src.utils.constants import AUTOSCRAPER_REPETICIONES
+import time
 
 
-def actualizar_alerta(self):
-    _json = {
-        "token": UPDATER_TOKEN,
-        "instruction": "actualizar_alerta",
-    }
-    actualizar_alerta = requests.post(url=self.url, json=_json)
-
-    return actualizar_alerta.json()
+def enviar_correo_resumen(mensaje):
+    print("******************", mensaje, "*******************")
 
 
-def actualizar(self, actualizar_alerta):
-    scraper_responses = gather_all.gather_threads(
-        dash=self, all_updates=actualizar_alerta
-    )
-    with open("latest_update.json", "w") as outfile:
-        outfile.write(json.dumps(scraper_responses))
+def workflow_alertas(self):
 
-    _json = {
-        "token": UPDATER_TOKEN,
-        "instruction": "do_updates",
-        "data": scraper_responses,
-    }
-    server_response = requests.post(url=self.url, json=_json)
-    if server_response.status_code == 200:
-        self.log(
-            action=f"ACTUALIZAR: Completo - Envio: {len(json.dumps(scraper_responses).encode("utf-8")) / 1024 / 1024:.2f} MB",
-        )
-    else:
-        self.log(action=f"[ERROR] Actualizacion: {server_response.status_code}")
-
-
-def crear_mensajes(self):
-    # borrar todos los mensajes antiguos
-    _json = {
-        "token": UPDATER_TOKEN,
-        "instruction": "create_messages",
-    }
-    created_messages = requests.post(url=self.url, json=_json).json()
-    return created_messages
-
-
-def enviar_correo_resumen(self, mensaje):
-    print(mensaje)
-
-
-def enviar_alertas(self):
-    _json = {
-        "token": UPDATER_TOKEN,
-        "instruction": "send_messages",
-    }
-    sent_messages = requests.post(url=self.url, json=_json)
-    self.log(action=f"*** Mensajes enviados: {sent_messages.content}")
-
-    return redirect("/")
-
-
-def main(self):
-
-    # 1. solicitar alertas que requieren actualizacion, actualizar y grabar
+    # intentar una cantidad de veces actualizar el 100% de pendientes
     repetir = 0
     while True:
 
         # solicitar alertas pendientes para enviar a actualizar
-        alertas = actualizar_alerta(self)
+        self.datos_alerta()
 
         # si ya no hay actualizaciones pendientes, siguiente paso
-        if all([len(j) == 0 for j in alertas.values()]):
+        pendientes = self.actualizar_datos.json()
+
+        # revisar si actualizar detuvo el proceso de autoscraper
+        if not self.auto_scraper_continue_flag:
+            self.log(action="[ AUTOSCRAPER ] Abortado.")
+            return
+
+        # si no quedan registros por actualizar, continuar
+        if all([len(j) == 0 for j in pendientes.values()]):
             break
         else:
-            actualizar(self, alertas)
+            self.actualizar()
             repetir += 1
-            if repetir > 3:
-                enviar_correo_resumen(self, "Error")
+
+        # excede cantidad de repeticiones, al menos un scraper no esta actualizando bien
+        if repetir > AUTOSCRAPER_REPETICIONES:
+            enviar_correo_resumen("ALERTAS: No se puedo completar scraping.")
+            return "error scrapers"
+
+        time.sleep(1)
+
+    # crear correos de alertas
+    self.generar_alertas()
+    enviar_correo_resumen(f"Mensajes creados: {len(self.created_messages)}")
+
+
+def workflow_boletines(self):
+
+    # intentar una cantidad de veces actualizar el 100% de pendientes
+    repetir = 0
+    while True:
+
+        # solicitar alertas pendientes para enviar a actualizar
+        self.datos_boletin()
+        pendientes = self.actualizar_datos.json()
+
+        # si ya no hay actualizaciones pendientes, siguiente paso
+        if all([len(j) == 0 for j in pendientes.values()]):
+            break
+        else:
+            self.actualizar()
+            repetir += 1
+
+            # revisar si actualizar detuvo el proceso de autoscraper
+            if not self.auto_scraper_continue_flag:
+                self.log(action="[ AUTOSCRAPER ] Abortado.")
+                return
+
+            # excede cantidad de repeticiones, al menos un scraper no esta actualizando bien
+            elif repetir > AUTOSCRAPER_REPETICIONES:
+                enviar_correo_resumen("BOLETNES: No se puedo completar scraping.")
                 return "error scrapers"
+
             time.sleep(1)
 
-    # 2. crear correos de alertas
-    f = crear_mensajes(self)
-    enviar_correo_resumen(self, f"Mensajes creados: {len(f)}")
-    return f"Mensajes creados: {len(f)}"
+    # crear correos de alertas
+    self.generar_boletines()
+    enviar_correo_resumen(f"Mensajes creados: {len(self.created_messages)}")
 
-    # 3. enviar correos de alertas
-    # enviar_alertas(self)
+
+def flujo(self, tipo_mensaje):
+
+    # intentar una cantidad de veces actualizar el 100% de pendientes
+    repetir = 0
+    while True:
+
+        # solicitar alertas/boletines pendientes para enviar a actualizar
+        if tipo_mensaje == "alertas":
+            self.datos_alerta()
+        elif tipo_mensaje == "boletines":
+            self.datos_boletin()
+
+        # tomar datos pendientes de ser actualizados del atributo
+        pendientes = self.actualizar_datos.json()
+
+        # si ya no hay actualizaciones pendientes, siguiente paso
+        if all([len(j) == 0 for j in pendientes.values()]):
+            break
+        else:
+            self.actualizar()
+            repetir += 1
+
+            # revisar si actualizar detuvo el proceso de autoscraper
+            if not self.auto_scraper_continue_flag:
+                self.log(action="[ AUTOSCRAPER ] Abortado.")
+                return
+
+            # excede cantidad de repeticiones, al menos un scraper no esta actualizando bien
+            elif repetir > AUTOSCRAPER_REPETICIONES:
+                enviar_correo_resumen("BOLETNES: No se puedo completar scraping.")
+                return "error scrapers"
+
+            time.sleep(1)
+
+    # crear correos de alertas/boletines
+    if tipo_mensaje == "alertas":
+        self.generar_alertas()
+    elif tipo_mensaje == "boletines":
+        self.generar_boletines()
+
+    enviar_correo_resumen(f"Mensajes creados: {len(self.created_messages)}")
+
+
+def main(self):
+
+    self.log(action="[ AUTOSCRAPER ] Inicio")
+
+    # ----- ALERTAS -----
+    flujo(self, tipo_mensaje="alertas")
+    self.log(action="[ AUTOSCRAPER ] Fin Alertas")
+
+    # ----- BOLETINES -----
+    flujo(self, tipo_mensaje="boletines")
+    self.log(action="[ AUTOSCRAPER ] Fin Boletines")
+
+    self.log(action="[ AUTOSCRAPER ] Fin")

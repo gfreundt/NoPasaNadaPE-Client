@@ -12,13 +12,9 @@
 <body>
     <div class="container-fluid p-3">
 
-    <!-- Top Headers (Left and Right boxes) have been removed as requested -->
-
     <div class="row">
-        <!-- Left Main Column: Cards and Table -->
         <div class="col-lg-8">
             
-            <!-- Cards Container: 4 horizontal by 8 vertical -->
             <div class="row mb-4" id="cards-container">
                 {% for i in range(32) %}
                 <div class="col-6 col-md-3 mb-2 px-1">
@@ -36,8 +32,6 @@
                 {% endfor %}
             </div>
 
-            <!-- KPI Table Underneath Cards -->
-            <!-- Wrapped in a row/col structure to match the width and alignment of the cards above -->
             <div class="row mb-4">
                 <div class="col-12 px-1">
                     <div class="p-3 border rounded shadow-sm bg-white">
@@ -55,7 +49,6 @@
                             </thead>
                             <tbody>
                                 <tr>
-                                    <!-- Data is populated via dashboard.js targeting these IDs -->
                                     <td id="kpi-active-threads"></td>
                                     <td id="kpi-truecaptcha-balance"></td>
                                     <td id="kpi-zeptomail-balance"></td>
@@ -70,25 +63,104 @@
                 </div>
             </div>
 
+            <div class="row mb-4">
+                <div class="col-12 px-1">
+                    <div class="p-3 border rounded shadow-sm bg-white">
+                        <h6 class="fw-bold mb-2 text-center" style="font-size: 1.3rem;">Estado de Scrapers</h6>
+                        <table class="table table-bordered table-sm text-center mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 20%;">Categoría</th>
+                                    <th style="width: 10%;">Status</th>
+                                    <th style="width: 10%;">Pendientes</th>
+                                    <th style="width: 30%;">ETA</th>
+                                    <th style="width: 30%;">Última Actividad</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="text-end pe-2">DataMtcBrevetes</td>
+                                    <td id="scraperkpi-status-DataMtcBrevetes"></td>
+                                    <td id="scraperkpi-pendientes-DataMtcBrevetes"></td>
+                                    <td id="scraperkpi-ETA-DataMtcBrevetes"></td>
+                                    <td id="scraperkpi-threads_activos-DataMtcBrevetes"></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end pe-2">DataMtcRecordsConductores</td>
+                                    <td id="scraperkpi-status-DataMtcRecordsConductores"></td>
+                                    <td id="scraperkpi-pendientes-DataMtcRecordsConductores"></td>
+                                    <td id="scraperkpi-ETA-DataMtcRecordsConductores"></td>
+                                    <td id="scraperkpi-threads_activos-DataMtcRecordsConductores"></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end pe-2">DataMtcRevisionesTecnicas</td>
+                                    <td id="scraperkpi-status-DataMtcRevisionesTecnicas"></td>
+                                    <td id="scraperkpi-pendientes-DataMtcRevisionesTecnicas"></td>
+                                    <td id="scraperkpi-ETA-DataMtcRevisionesTecnicas"></td>
+                                    <td id="scraperkpi-threads_activos-DataMtcRevisionesTecnicas"></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end pe-2">DataSatImpuestos</td>
+                                    <td id="scraperkpi-status-satimp"></td>
+                                    <td id="scraperkpi-pendientes-satimp"></td>
+                                    <td id="scraperkpi-ETA-satimp"></td>
+                                    <td id="scraperkpi-threads_activos-satimp"></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end pe-2">DataSatMultas</td>
+                                    <td id="scraperkpi-status-DataSatMultas"></td>
+                                    <td id="scraperkpi-pendientes-DataSatMultas"></td>
+                                    <td id="scraperkpi-ETA-DataSatMultas"></td>
+                                    <td id="scraperkpi-threads_activos-DataSatMultas"></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end pe-2">DataApesegSoats</td>
+                                    <td id="scraperkpi-status-DataApesegSoats"></td>
+                                    <td id="scraperkpi-pendientes-DataApesegSoats"></td>
+                                    <td id="scraperkpi-ETA-DataApesegSoats"></td>
+                                    <td id="scraperkpi-threads_activos-DataApesegSoats"></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end pe-2">DataSunarpFichas</td>
+                                    <td id="scraperkpi-status-DataSunarpFichas"></td>
+                                    <td id="scraperkpi-pendientes-DataSunarpFichas"></td>
+                                    <td id="scraperkpi-ETA-DataSunarpFichas"></td>
+                                    <td id="scraperkpi-threads_activos-DataSunarpFichas"></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end pe-2">DataSutranMultas</td>
+                                    <td id="scraperkpi-status-DataSutranMultas"></td>
+                                    <td id="scraperkpi-pendientes-DataSutranMultas"></td>
+                                    <td id="scraperkpi-ETA-DataSutranMultas"></td>
+                                    <td id="scraperkpi-threads_activos-DataSutranMultas"></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-end pe-2">Extra</td>
+                                    <td id="scraperkpi-status-extra"></td>
+                                    <td id="scraperkpi-pendientes-extra"></td>
+                                    <td id="scraperkpi-ETA-extra"></td>
+                                    <td id="scraperkpi-threads_activos-extra"></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
-        <!-- Right Sidebar Column: Text Area and Buttons -->
         <div class="col-lg-4 d-flex flex-column">
             
-            <!-- Text Area -->
             <div class="p-3 border rounded shadow-sm bg-white mb-3">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="fw-bold">Logs</span>
                     <button id="clear-btn" class="btn btn-sm text-white" style="background-color: #39e75f;">Limpiar</button>
                 </div>
-                <!-- Updated height to 700px to match the approx height of 8 card rows -->
-                <textarea id="activities-text-area" class="form-control" style="resize: vertical; height: 700px;" placeholder="Esperando Comando..." readonly></textarea>
+                <textarea id="activities-text-area" class="form-control" style="resize: vertical; height: 700px; font-size: 12px;" placeholder="Esperando Comando..." readonly></textarea>
             </div>
 
-            <!-- Buttons Section Split into 3 Columns -->
             <div class="p-3 border rounded shadow-sm bg-white">
                 <div class="row g-1">
-                    <!-- Column 1: Alertas -->
                     <div class="col-4">
                         <div class="text-center fw-bold mb-2 small">Alertas</div>
                         <form method="POST" action="/datos_alertas" class="mb-2">
@@ -97,7 +169,7 @@
                         <form method="POST" action="/actualizar" class="mb-2">
                             <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Actualizar</button>
                         </form>
-                        <form method="POST" action="/generar_mensajes" class="mb-2">
+                        <form method="POST" action="/generar_alertas" class="mb-2">
                             <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Generar</button>
                         </form>
                         <form method="POST" action="/enviar_mensajes" class="mb-2">
@@ -105,7 +177,6 @@
                         </form>
                     </div>
 
-                    <!-- Column 2: Boletines (Duplicated Buttons) -->
                     <div class="col-4">
                         <div class="text-center fw-bold mb-2 small">Boletines</div>
                         <form method="POST" action="/datos_boletines" class="mb-2">
@@ -114,7 +185,7 @@
                         <form method="POST" action="/actualizar" class="mb-2">
                             <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Actualizar</button>
                         </form>
-                        <form method="POST" action="/generar_mensajes" class="mb-2">
+                        <form method="POST" action="/generar_boletines" class="mb-2">
                             <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Generar</button>
                         </form>
                         <form method="POST" action="/enviar_mensajes" class="mb-2">
@@ -122,7 +193,6 @@
                         </form>
                     </div>
 
-                    <!-- Column 3: System (Original Right Column) -->
                     <div class="col-4">
                         <div class="text-center fw-bold mb-2 small">Sistema</div>
                         <form method="POST" action="/test" class="mb-2">

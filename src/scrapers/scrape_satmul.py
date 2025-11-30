@@ -1,102 +1,53 @@
 import base64
 import time
 import requests
+from datetime import datetime as dt, timedelta as td
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
+from selenium.common.exceptions import NoSuchElementException
+from func_timeout import func_set_timeout, exceptions
 
-from src.utils.webdriver import ChromeUtils
-from src.utils.constants import HEADLESS, TWOCAPTCHA_API_KEY
-
-
-def solve_recaptcha(webdriver, page_url):
-    """
-    Extracts the sitekey, sends solve request to 2captcha,
-    polls for result, and returns the token.
-    """
-
-    # Find recaptcha sitekey
-    sitekey = webdriver.find_element(By.CSS_SELECTOR, ".g-recaptcha").get_attribute(
-        "data-sitekey"
-    )
-
-    # Send solve request
-    resp = requests.post(
-        "http://2captcha.com/in.php",
-        data={
-            "key": TWOCAPTCHA_API_KEY,
-            "method": "userrecaptcha",
-            "googlekey": sitekey,
-            "pageurl": page_url,
-        },
-    ).text
-
-    if "OK|" not in resp:
-        return False
-
-    task_id = resp.split("|")[1]
-
-    # Poll until solved
-    token = None
-    for _ in range(48):  # ~4 minutes max
-        time.sleep(5)
-        check = requests.get(
-            "http://2captcha.com/res.php",
-            params={"key": TWOCAPTCHA_API_KEY, "action": "get", "id": task_id},
-        ).text
-
-        if check == "CAPCHA_NOT_READY":
-            continue
-
-        if "OK|" in check:
-            token = check.split("|")[1]
-            break
-
-        return False
-
-    if not token:
-        return False
-
-    return token
+from src.utils.constants import TWOCAPTCHA_API_KEY, SCRAPER_TIMEOUT
 
 
-def browser(placa):
+@func_set_timeout(SCRAPER_TIMEOUT["satmuls"])
+def browser_wrapper(doc_num, webdriver):
+    try:
+        return browser(doc_num, webdriver)
+    except exceptions.FunctionTimedOut:
+        return "Timeout"
 
-    # construir webdriver con parametros especificos
-    chromedriver = ChromeUtils(
-        headless=HEADLESS["satmul"],
-    )
-    webdriver = chromedriver.direct_driver()
 
-    # Load SAT portal
-    webdriver.get("https://www.sat.gob.pe/WebSitev8/IncioOV2.aspx")
-    time.sleep(5)
+def browser(placa, webdriver):
 
-    # Redirect to papeletas page
-    sess = webdriver.current_url.split("=")[-1]
-    target = f"https://www.sat.gob.pe/VirtualSAT/modulos/papeletas.aspx?tri=T&mysession={sess}"
-    webdriver.get(target)
+    # abrir url
+    url_inicial = "https://www.sat.gob.pe/WebSitev8/IncioOV2.aspx"
+    webdriver.get(url_inicial)
+
+    # extraer codigo de sesion y navegar a url final
+    url_final = f"""https://www.sat.gob.pe/VirtualSAT/modulos/papeletas.aspx?
+                    tri=T&mysession={webdriver.current_url.split("=")[-1]}"""
+    webdriver.get(url_final)
     time.sleep(1)
 
-    # Reset dropdown
+    # resetar el boton de opciones
     drop = Select(webdriver.find_element(By.ID, "tipoBusquedaPapeletas"))
     drop.select_by_value("busqLicencia")
     time.sleep(0.5)
     drop.select_by_value("busqPlaca")
 
-    # Enter placa
+    # ingresar placa
     campo = webdriver.find_element(By.ID, "ctl00_cplPrincipal_txtPlaca")
     campo.send_keys(placa)
     time.sleep(0.5)
 
-    # ----------------------------------------------------
-    # SOLVE CAPTCHA HERE
-    # ----------------------------------------------------
+    # resolver recaptcha
     token = solve_recaptcha(webdriver, webdriver.current_url)
     if not token:
-        return -1
+        return "Problemas con Resolucion de Recaptcha"
 
-    # Inject token into g-recaptcha-response
+    # inyectar token en 'g-recaptcha-response'
     webdriver.execute_script(
         """
         document.getElementById('g-recaptcha-response').style.display = 'block';
@@ -106,42 +57,37 @@ def browser(placa):
     """,
         token,
     )
-
     time.sleep(1)
 
-    # Click Buscar button (CaptchaContinue)
+    # click en continuar
     try:
         webdriver.find_element(By.ID, "ctl00_cplPrincipal_CaptchaContinue").click()
     except Exception:
-        pass
+        return "No Se Pudo Hacer Click en Boton de Continuar"
 
     # Wait for results to load
     time.sleep(3)
 
-    # ----------------------------------------------------
-    # PARSE RESULTS
-    # ----------------------------------------------------
+    # respuesta correcta sin papeletas
     empty_msg = webdriver.find_elements(By.ID, "ctl00_cplPrincipal_lblMensajeVacio")
     if empty_msg and "No se encontraron" in empty_msg[0].text:
-        webdriver.find_element(By.ID, "menuOption10").click()
-        webdriver.quit()
+        # regresar a "consulta de papeletas" para siguiente iteracion y devolver en blanco
+        regresar_inicio(webdriver, url_final)
         return []
 
-    # Papeletas found
+    # respuesta correcta con papeletas
     n = 2
     responses = []
 
-    xpath = lambda row, col: webdriver.find_elements(
-        By.XPATH,
-        f"/html/body/form/div[3]/section/div/div/div[2]/div[8]/div/div/div[1]/div/div/table/tbody/tr[{row}]/td[{col}]",
-    )
+    # extrae todas las filas de multas
+    while xpath_generator(webdriver, n, 1):
 
-    while xpath(n, 1):
+        # extraer campos (excepto fila 12)
+        resp = [
+            xpath_generator(webdriver, n, k + 2)[0].text for k in range(14) if k != 10
+        ]
 
-        # Extract fields (except col 12)
-        resp = [xpath(n, k + 2)[0].text for k in range(14) if k != 10]
-
-        # Extract image/document URLs
+        # url de potenciales imagenes
         ids = (
             "ctl00_cplPrincipal_grdEstadoCuenta_ctl02_lnkImagen",
             "ctl00_cplPrincipal_grdEstadoCuenta_ctl02_lnkDocumento",
@@ -152,7 +98,7 @@ def browser(placa):
             w = webdriver.find_elements(By.ID, id)
             urls.append(w[0].get_attribute("href") if w else "")
 
-        # Download images
+        # descargar imagenes
         ids = ("imgPapel", "imgPapeleta")
         for id, url in zip(ids, urls):
             if url:
@@ -171,5 +117,76 @@ def browser(placa):
         responses.append(resp)
         n += 1
 
-    webdriver.quit()
+    # regresar a "consulta de papeletas" para siguiente iteracion y devolver respuestas
+    regresar_inicio(webdriver, url_final)
     return responses
+
+
+def xpath_generator(webdriver, row, col):
+    return webdriver.find_elements(
+        By.XPATH,
+        f"/html/body/form/div[3]/section/div/div/div[2]/div[8]/div/div/div[1]/div/div/table/tbody/tr[{row}]/td[{col}]",
+    )
+
+
+def regresar_inicio(webdriver, url_final):
+    try:
+        webdriver.find_element(By.ID, "menuOption10").click()
+    except NoSuchElementException:
+        webdriver.get(url_final)
+        time.sleep(1)
+
+
+def solve_recaptcha(webdriver, page_url):
+    """
+    Extracts the sitekey, sends solve request to 2captcha,
+    polls for result, and returns the token.
+    """
+
+    # Find recaptcha sitekey
+    sitekey = webdriver.find_element(By.CSS_SELECTOR, ".g-recaptcha").get_attribute(
+        "data-sitekey"
+    )
+
+    # Send solve request
+    try:
+        resp = requests.post(
+            "http://2captcha.com/in.php",
+            data={
+                "key": TWOCAPTCHA_API_KEY,
+                "method": "userrecaptcha",
+                "googlekey": sitekey,
+                "pageurl": page_url,
+            },
+        ).text
+
+        if "OK|" not in resp:
+            return False
+
+        task_id = resp.split("|")[1]
+
+        # Poll until solved
+        token = None
+        for _ in range(48):  # ~4 minutes max
+            time.sleep(5)
+            check = requests.get(
+                "http://2captcha.com/res.php",
+                params={"key": TWOCAPTCHA_API_KEY, "action": "get", "id": task_id},
+            ).text
+
+            if check == "CAPCHA_NOT_READY":
+                continue
+
+            if "OK|" in check:
+                token = check.split("|")[1]
+                break
+
+            return False
+
+        if not token:
+            return False
+
+        return token
+
+    except Exception:
+        return False

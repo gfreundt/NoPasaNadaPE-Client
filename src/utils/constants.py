@@ -51,10 +51,17 @@ PROXY_DC_PASSWORD = "8ydfm761xeeh"
 PROXY_RES_PASSWORD = "u30iyjwv3gb3"
 PROXY_HOST = "brd.superproxy.io"
 PROXY_PORT = "33335"
-API_KEY = "ef171193dfc40c427dc3c015fc4b247b194752a8f700ad5a45f9c5f17ee4ba4c"
+BRIGHT_DATA_API_KEY = "ef171193dfc40c427dc3c015fc4b247b194752a8f700ad5a45f9c5f17ee4ba4c"
+
+# truecaptcha
+TRUECAPTCHA_API_KEY = "UEJgzM79VWFZh6MpOJgh"
 
 # 2captcha recaptcha solver
 TWOCAPTCHA_API_KEY = "852d1d8f6c105fbc6b5d86abed7a2370"
+
+# google cloud
+GC_BILLING_ACCOUNT_ID = "012345-67890A-BCDEF0"  # FAKE!
+GC_BUDGET_ID = "projects/123456789012/budgets/MyMonthlyBudget"  # FAKE!
 
 # 3-letter months
 MONTHS_3_LETTERS = (
@@ -74,33 +81,33 @@ MONTHS_3_LETTERS = (
 
 # scrapers headless (debugging)
 HEADLESS = {
-    "brevete": False,
+    "brevetes": True,
     "satimp": True,
     "soat": True,
     "jneafil": True,
     "jnemulta": True,
     "osiptel": True,
     "satmul": True,
-    "recvehic": False,
-    "revtec": False,
+    "recvehic": True,
+    "revtec": True,
     "sunarp": True,
     "sunat": True,
     "sutran": True,
 }
 
 SCRAPER_TIMEOUT = {
-    "brevetes": False,
-    "satimp": True,
+    "brevetes": 60,
+    "satimps": 60,
     "soat": 60,
     "jneafil": True,
     "jnemulta": True,
     "osiptel": True,
-    "satmul": True,
-    "recvehic": False,
+    "satmuls": 240,
+    "recvehic": 60,
     "revtec": 60,
-    "sunarp": True,
+    "sunarps": 60,
     "sunat": True,
-    "sutran": True,
+    "sutrans": 60,
 }
 
 DASHBOARD_URL = "wvpeagu2d27l6v7b"
@@ -152,3 +159,4 @@ MTC_CAPTCHAS = {
 }
 
 GATHER_ITERATIONS = 3
+AUTOSCRAPER_REPETICIONES = 3

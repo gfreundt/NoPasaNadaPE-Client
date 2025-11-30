@@ -1,0 +1,7 @@
+# uv_constraints.txt
+
+# Force the specific blinker version required by older selenium-wire/mitmproxy
+blinker==1.4
+
+# Pin selenium-wire to a version that works better with blinker 1.4
+selenium-wire==4.6.4

@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.13.4",
-    "flask>=3.1.1",
+    "blinker==1.4",
+    "flask<3.0",
+    "func-timeout>=4.3.5",
     "google-cloud-vision>=3.10.2",
     "img2pdf>=0.6.1",
     "jinja2>=3.1.6",
@@ -15,4 +17,7 @@ dependencies = [
     "pyautogui>=0.9.54",
     "requests>=2.32.4",
     "selenium>=4.34.2",
+    "selenium-wire>=5.1.0",
+    "setuptools>=80.9.0",
+    "tqdm>=4.67.1",
 ]

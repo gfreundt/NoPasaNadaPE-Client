@@ -6,9 +6,11 @@ import requests
 import base64
 import socket
 import random
-import pyautogui
-from pyautogui import ImageNotFoundException
-from src.utils.constants import MONTHS_3_LETTERS, NETWORK_PATH
+
+# import pyautogui
+# from pyautogui import ImageNotFoundException
+from selenium.webdriver.common.by import By
+from src.utils.constants import MONTHS_3_LETTERS, NETWORK_PATH, TWOCAPTCHA_API_KEY
 
 
 def date_to_db_format(data):
@@ -81,20 +83,94 @@ def date_to_user_format(fecha):
     return f"{_day}-{_month}-{_year}"
 
 
-def use_truecaptcha(image):
+def use_truecaptcha(image, retries=3):
+    """
+    Recibe imagen y la envia al servicio externo de deteccion TRUECAPTCHA
+    para transformarlo en texto
+
+    :param image: Objeto en Bytes
+    :param retries: Cuantas veces volver a intentar si el servicio esta offline
+
+    Correcto: retorna diccionario, con el texto en llave "result"
+    Error: retorna False
+    """
 
     # legacy: transform received path to object
     if type(image) is str:
         image = open(image, "rb")
 
+    retry_attempts = 0
     _url = "https://api.apitruecaptcha.org/one/gettext"
     _data = {
         "userid": "gabfre@gmail.com",
         "apikey": "UEJgzM79VWFZh6MpOJgh",
         "data": base64.b64encode(image.read()).decode("ascii"),
     }
-    response = requests.post(url=_url, json=_data)
-    return response.json()
+    while True:
+        try:
+            response = requests.post(url=_url, json=_data)
+            return response.json()
+        except ConnectionError:
+            retry_attempts += 1
+            if retry_attempts <= retries:
+                time.sleep(10)
+                continue
+            return False
+
+
+def solve_recaptcha(webdriver, page_url):
+    """
+    Extracts the sitekey, sends solve request to 2captcha,
+    polls for result, and returns the token.
+    """
+
+    # Find recaptcha sitekey
+    sitekey = webdriver.find_element(By.CSS_SELECTOR, ".g-recaptcha").get_attribute(
+        "data-sitekey"
+    )
+
+    # Send solve request
+    try:
+        resp = requests.post(
+            "http://2captcha.com/in.php",
+            data={
+                "key": TWOCAPTCHA_API_KEY,
+                "method": "userrecaptcha",
+                "googlekey": sitekey,
+                "pageurl": page_url,
+            },
+        ).text
+
+        if "OK|" not in resp:
+            return False
+
+        task_id = resp.split("|")[1]
+
+        # Poll until solved
+        token = None
+        for _ in range(48):  # ~4 minutes max
+            time.sleep(5)
+            check = requests.get(
+                "http://2captcha.com/res.php",
+                params={"key": TWOCAPTCHA_API_KEY, "action": "get", "id": task_id},
+            ).text
+
+            if check == "CAPCHA_NOT_READY":
+                continue
+
+            if "OK|" in check:
+                token = check.split("|")[1]
+                break
+
+            return False
+
+        if not token:
+            return False
+
+        return token
+
+    except Exception:
+        return False
 
 
 def base64_to_image(base64_string, output_path):
@@ -112,51 +188,73 @@ def get_local_ip():
     return s.getsockname()[0]
 
 
-def change_vpn_manually():
-    COUNTRIES = [
-        "Alemania",
-        "Argentina",
-        "Argelia",
-        "Brasil",
-        "Ecuador",
-        "Espa",
-        "Egipto",
-        "Atlanta",
-        "Miami",
-        "Phoenix",
-        "Letonia",
-        "Venezuela",
-        "Uruguay",
-        "Nueva Ze",
-    ]
+def get_public_ip():
+    """Fetches the current public IP address."""
+    try:
+        # Use a reliable IP check service (e.g., ipify.org)
+        response = requests.get("https://api.ipify.org?format=json", timeout=10)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        return response.json()["ip"]
+    except requests.RequestException as e:
+        print(f"Error fetching IP: {e}")
+        return None
 
-    new_vpn = random.choice(COUNTRIES)
 
-    while True:
-        try:
-            x = pyautogui.locateCenterOnScreen(
-                os.path.join(NETWORK_PATH, "static", "arrowVPN.png"),
-                region=(2500, 1200, 4000, 1800),
-                confidence=0.7,
-            )
-            pyautogui.click(x)
-            time.sleep(1)
-            for i in new_vpn:
-                pyautogui.press(i)
-                time.sleep(0.2)
-            pyautogui.moveRel((-380, -390))
-            pyautogui.click()
-            time.sleep(3)
-            return True
+def check_vpn_online():
+    """
+    Revisa si el VPN esta en linea.
+    Si el Network Prefix del IP no es el usual usado por el VPN, retorna False
+    """
+    current_ip = get_public_ip()
+    if current_ip and current_ip[:3] == "198":
+        return True
 
-        except (ValueError, ImageNotFoundException):
-            try:
-                x = pyautogui.locateCenterOnScreen(
-                    os.path.join(NETWORK_PATH, "static", "iconVPN.png"),
-                    region=(2000, 2050, 2800, 2180),
-                    confidence=0.9,
-                )
-                time.sleep(1)
-                pyautogui.click(x)
-            except (ValueError, ImageNotFoundException):
-                return False
+
+# def change_vpn_manually():
+#     COUNTRIES = [
+#         "Alemania",
+#         "Argentina",
+#         "Argelia",
+#         "Brasil",
+#         "Ecuador",
+#         "Espa",
+#         "Egipto",
+#         "Atlanta",
+#         "Miami",
+#         "Phoenix",
+#         "Letonia",
+#         "Venezuela",
+#         "Uruguay",
+#         "Nueva Ze",
+#     ]
+
+#     new_vpn = random.choice(COUNTRIES)
+
+#     while True:
+#         try:
+#             x = pyautogui.locateCenterOnScreen(
+#                 os.path.join(NETWORK_PATH, "static", "arrowVPN.png"),
+#                 region=(2500, 1200, 4000, 1800),
+#                 confidence=0.7,
+#             )
+#             pyautogui.click(x)
+#             time.sleep(1)
+#             for i in new_vpn:
+#                 pyautogui.press(i)
+#                 time.sleep(0.2)
+#             pyautogui.moveRel((-380, -390))
+#             pyautogui.click()
+#             time.sleep(3)
+#             return True
+
+#         except (ValueError, ImageNotFoundException):
+#             try:
+#                 x = pyautogui.locateCenterOnScreen(
+#                     os.path.join(NETWORK_PATH, "static", "iconVPN.png"),
+#                     region=(2000, 2050, 2800, 2180),
+#                     confidence=0.9,
+#                 )
+#                 time.sleep(1)
+#                 pyautogui.click(x)
+#             except (ValueError, ImageNotFoundException):
+#                 return False

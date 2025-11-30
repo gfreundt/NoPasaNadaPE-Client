@@ -55,7 +55,7 @@ def browser(doc_num, webdriver):
     # evadir captcha ("No Soy Un Robot")
     exito = evade_captcha(webdriver)
     if not exito:
-        return "Sin Solucion de Captcha"
+        return "@Sin Solucion de Captcha"
 
     # click en Buscar
     webdriver.find_element(
@@ -64,10 +64,17 @@ def browser(doc_num, webdriver):
     ).click()
     time.sleep(3)
 
-    # si no hay informacion de usuario
+    # si no hay informacion de usuario retornar blanco
     _test = webdriver.find_elements(By.ID, "swal2-html-container")
-    if _test and "No se" in _test[0].text:
-        webdriver.quit()
+    if _test and "persona" in _test[0].text:
+        # presionar "OK"
+        try:
+            btn = webdriver.find_element(
+                By.XPATH, "/html/body/div[2]/div/div[6]/button[1]"
+            )
+            webdriver.execute_script("arguments[0].click();", btn)
+        except Exception:
+            webdriver.refresh()
         return []
 
     # scrape data
@@ -87,8 +94,8 @@ def browser(doc_num, webdriver):
         time.sleep(1)
         timeout += 1
         if timeout > 10:
-            webdriver.quit()
-            return "Error en Puntos"
+            webdriver.refresh()
+            return "@Error en Puntos"
     time.sleep(1.5)
 
     action = ActionChains(webdriver)

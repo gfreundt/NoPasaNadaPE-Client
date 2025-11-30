@@ -1,23 +1,28 @@
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException
 import time
-from src.utils.webdriver import ChromeUtils
-from src.utils.constants import HEADLESS
+from func_timeout import func_set_timeout, exceptions
+from src.utils.constants import SCRAPER_TIMEOUT
 
 
-def browser(placa):
+@func_set_timeout(SCRAPER_TIMEOUT["sutrans"])
+def browser_wrapper(placa, webdriver):
+    try:
+        return browser(placa, webdriver)
+    except exceptions.FunctionTimedOut:
+        return "Timeout"
 
-    chromedriver = ChromeUtils(
-        headless=HEADLESS["sutran"], verbose=False, maximized=True
-    )
-    webdriver = chromedriver.direct_driver()
 
-    webdriver.get(
-        "https://www.sutran.gob.pe/consultas/record-de-infracciones/record-de-infracciones/"
-    )
-    time.sleep(1.5)
+def browser(placa, webdriver):
 
-    # ensure page loading with refresh
-    webdriver.refresh()
+    url = "https://www.sutran.gob.pe/consultas/record-de-infracciones/record-de-infracciones/"
+    webdriver.get(url)
+    time.sleep(2)
+
+    if not revisar_carga_pagina(webdriver):
+        return "Error Cargando Pagina"
 
     while True:
         # capture captcha image from frame name
@@ -54,8 +59,7 @@ def browser(placa):
 
         # if no pendings, return empty dictionary
         if "pendientes" in _alerta:
-            webdriver.quit()
-            return {}
+            return []
         else:
             break
 
@@ -85,5 +89,19 @@ def browser(placa):
     response.pop()
 
     # succesful, return list of dictionaries
-    webdriver.quit()
     return response
+
+
+def revisar_carga_pagina(webdriver):
+    intentos_carga = 0
+    while intentos_carga < 3:
+        try:
+            WebDriverWait(webdriver, 5).until(
+                EC.presence_of_element_located((By.ID, "post-1120"))
+            )
+            return True
+        except TimeoutException:
+            intentos_carga += 1
+            webdriver.refresh()
+
+    return False

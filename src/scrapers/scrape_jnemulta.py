@@ -27,6 +27,8 @@ def browser(doc_num):
 
         # get captcha text and validate
         captcha_txt = use_truecaptcha(_captcha_file_like)["result"]
+        if not captcha_txt:
+            return "Servicio Captcha Offline."
         if len(captcha_txt) != 6:
             webdriver.refresh()
             time.sleep(3)

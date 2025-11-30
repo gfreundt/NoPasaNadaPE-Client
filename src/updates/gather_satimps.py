@@ -1,10 +1,12 @@
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as td
 import threading
 import queue
+import time
 
 # local imports
 from src.scrapers import scrape_satimp
-from src.utils.constants import GATHER_ITERATIONS
+from src.utils.webdriver import ChromeUtils
+from src.utils.constants import HEADLESS, GATHER_ITERATIONS
 
 
 def manage_sub_threads(dash, update_data, full_response):
@@ -20,6 +22,7 @@ def manage_sub_threads(dash, update_data, full_response):
     # launch and join N sub-threads for the main thread
     lock = threading.Lock()
     threads = []
+    card = 15
     for _ in range(GATHER_ITERATIONS):
         t = threading.Thread(
             target=gather,
@@ -30,10 +33,13 @@ def manage_sub_threads(dash, update_data, full_response):
                 local_response_deudas,
                 len(update_data),
                 lock,
+                card,
+                card - 15,
             ),
         )
         t.start()
         threads.append(t)
+        card += 1
     for t in threads:
         t.join()
 
@@ -49,115 +55,147 @@ def gather(
     local_response_deudas,
     total_original,
     lock,
+    card,
+    subthread,
 ):
 
-    CARD = 3
+    # construir webdriver con parametros especificos
+    chromedriver = ChromeUtils(headless=HEADLESS["revtec"])
+    webdriver = chromedriver.direct_driver()
 
-    # log first action
-    dash.log(
-        card=CARD,
-        title=f"Impuestos SAT [{total_original}]",
-        status=1,
-        progress=0,
-        text="Inicializando",
-        lastUpdate="Actualizado:",
-    )
+    # iniciar variables para calculo de ETA
+    tiempo_inicio = time.perf_counter()
+    procesados = 0
+    eta = 0
 
     # iterate on all records that require updating and get scraper results
-    while not queue_update_data.empty():
+    while True:
 
-        # grab next record from update queue unless empty
+        # intentar extraer siguiente registro de cola compartida
         try:
-            id_member, doc_tipo, doc_num = queue_update_data.get_nowait()
+            record_item = queue_update_data.get_nowait()
+            id_member, doc_tipo, doc_num = record_item
         except queue.Empty:
+            # log de salida del scraper
+            dash.log(
+                card=card,
+                title=f"Impuestos SAT-{subthread} [PROCESADOS: {procesados}]",
+                status=3,
+                text="Inactivo",
+                lastUpdate=f"Fin: {dt.strftime(dt.now(),"%H:%M:%S")}",
+            )
             break
 
-        retry_attempts = 0
+        # se tiene un registro, intentar extraer la informacion
+        try:
+            dash.log(
+                card=card,
+                title=f"Impuestos SAT-{subthread} [Pendientes: {total_original-procesados}]",
+                status=1,
+                text=f"Procesando: {doc_tipo} {doc_num}",
+                lastUpdate=f"ETA: {eta}",
+            )
 
-        # loop to catch scraper errors and retry limited times
-        while retry_attempts < 3:
-            try:
-                # log action
-                dash.log(card=CARD, text=f"Procesando: {doc_tipo} {doc_num}")
+            # send request to scraper
+            scraper_response = scrape_satimp.browser_wrapper(
+                doc_tipo=doc_tipo, doc_num=doc_num, webdriver=webdriver
+            )
+            procesados += 1
 
-                # send request to scraper
-                new_records = scrape_satimp.browser(doc_tipo=doc_tipo, doc_num=doc_num)
+            # si respuesta es texto, hubo un error -- regresar
+            if isinstance(scraper_response, str):
+                dash.log(
+                    card=card,
+                    status=2,
+                    lastUpdate=f"ERROR: {scraper_response}",
+                )
+                # devolver registro a la cola para que otro thread lo complete
+                if record_item is not None:
+                    queue_update_data.put(record_item)
 
-                if not new_records:
-                    with lock:
-                        local_response_codigos.append(
+                # si error permite reinicio ("@") esperar 10 segundos y empezar otra vez
+                if "@" in scraper_response:
+                    dash.log(
+                        card=card,
+                        text="Reinicio en 10 segundos",
+                        status=1,
+                    )
+                    time.sleep(10)
+                    continue
+
+                # si error no permite reinicio, salir
+                break
+
+            # respuesta es en blanco
+            if not scraper_response:
+                with lock:
+                    local_response_codigos.append(
+                        {
+                            "Empty": True,
+                            "IdMember_FK": id_member,
+                        }
+                    )
+                dash.log(action=f"[ SATIMPS ] {doc_tipo} {doc_num}")
+                continue
+
+            _now = dt.now().strftime("%Y-%m-%d")
+
+            # contruir respuesta
+            for _n in scraper_response:
+                with lock:
+                    local_response_codigos.append(
+                        {
+                            "IdMember_FK": id_member,
+                            "Codigo": _n["codigo"],
+                            "LastUpdate": _now,
+                        }
+                    )
+                if _n["deudas"]:
+                    for deuda in _n["deudas"]:
+                        local_response_deudas.append(
                             {
-                                "Empty": True,
-                                "IdMember_FK": id_member,
-                            }
-                        )
-                    break
-
-                _now = dt.now().strftime("%Y-%m-%d")
-
-                for _n in new_records:
-                    with lock:
-                        local_response_codigos.append(
-                            {
-                                "IdMember_FK": id_member,
                                 "Codigo": _n["codigo"],
+                                "Ano": deuda[0],
+                                "Periodo": deuda[1],
+                                "DocNum": deuda[2],
+                                "TotalAPagar": deuda[3],
+                                "FechaHasta": deuda[4],
                                 "LastUpdate": _now,
                             }
                         )
-                    if _n["deudas"]:
-                        for deuda in _n["deudas"]:
-                            local_response_deudas.append(
-                                {
-                                    "Codigo": _n["codigo"],
-                                    "Ano": deuda[0],
-                                    "Periodo": deuda[1],
-                                    "DocNum": deuda[2],
-                                    "TotalAPagar": deuda[3],
-                                    "FechaHasta": deuda[4],
-                                    "LastUpdate": _now,
-                                }
-                            )
-                    else:
-                        local_response_deudas.append(
-                            {
-                                "Empty": True,
-                                "Codigo": _n["codigo"],
-                            }
-                        )
+                else:
+                    local_response_deudas.append(
+                        {
+                            "Empty": True,
+                            "Codigo": _n["codigo"],
+                        }
+                    )
 
-                # update dashboard with progress and last update timestamp
-                dash.log(
-                    card=CARD,
-                    progress=int(
-                        ((total_original - queue_update_data.qsize()) / total_original)
-                        * 100
-                    ),
-                    lastUpdate=dt.now(),
-                )
-                
-                # next record
-                break
+            # calcular ETA aproximado
+            duracion_promedio = (time.perf_counter() - tiempo_inicio) / procesados
+            eta = dt.strftime(
+                dt.now()
+                + td(seconds=duracion_promedio * (total_original - procesados)),
+                "%H:%M:%S",
+            )
 
-            except KeyboardInterrupt:
-                quit()
+            dash.log(action=f"[ SATIMPS ] {doc_tipo} {doc_num}")
 
-            except Exception:
-                retry_attempts += 1
-                dash.log(
-                    card=CARD,
-                    status=2,
-                    text=f"|ADVERTENCIA| Reintentando [{retry_attempts}/3]: {doc_tipo} {doc_num}",
-                )
+        except KeyboardInterrupt:
+            quit()
 
-        # if code gets here, means scraping has encountred three consecutive errors, skip record
-        dash.log(card=CARD, msg=f"|ERROR| No se pudo procesar {doc_tipo} {doc_num}.")
+        except Exception as e:
+            # devolver registro a la cola para que otro thread lo complete
+            if record_item is not None:
+                queue_update_data.put(record_item)
 
-    # log last action
-    dash.log(
-        card=CARD,
-        title="Impuestos SAT",
-        progress=100,
-        status=3,
-        text="Inactivo",
-        lastUpdate=dt.now(),
-    )
+            # actualizar dashboard
+            dash.log(
+                card=card,
+                text=f"Crash (Gather): {str(e)[:55]}",
+                status=2,
+            )
+            break
+
+    # cerrar el driver antes de volver
+    webdriver.quit()

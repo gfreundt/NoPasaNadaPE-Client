@@ -35,6 +35,8 @@ def browser(placa, webdriver):
         _img = webdriver.find_element(By.CLASS_NAME, "captcha-img")
         captcha_file_like = io.BytesIO(_img.screenshot_as_png)
         captcha_txt = use_truecaptcha(captcha_file_like)["result"]
+        if not captcha_txt:
+            return "Servicio Captcha Offline."
 
         # ingresar placa en campo
         webdriver.find_element(By.ID, "placa").send_keys(placa)
@@ -80,7 +82,7 @@ def browser(placa, webdriver):
                 for i in range(1, 13)
             ]
         except Exception:
-            response = "Sin Datos"
+            response = "@Sin Datos"
 
         # refrescar pagina para siguiente intento
         webdriver.back()

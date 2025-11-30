@@ -24,6 +24,8 @@ def browser(doc_num):
             ).screenshot_as_png
         )
         captcha_txt = use_truecaptcha(image=_captcha_file_like)["result"]
+        if not captcha_txt:
+            return "Servicio Captcha Offline."
 
         # enter data into fields and run
         webdriver.find_element(By.ID, "DNI").send_keys(doc_num)

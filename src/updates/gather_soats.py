@@ -10,7 +10,7 @@ import time
 # local imports
 from src.utils.utils import date_to_db_format
 from src.scrapers import scrape_soat as scraper
-from src.utils.constants import ASEGURADORAS, NETWORK_PATH, HEADLESS, GATHER_ITERATIONS
+from src.utils.constants import ASEGURADORAS, NETWORK_PATH, HEADLESS
 from src.utils.webdriver import ChromeUtils
 
 
@@ -24,40 +24,41 @@ def gather(
         incognito=True,
         window_size=(1920, 1080),
     )
-    webdriver = chromedriver.proxy_driver()
+    webdriver = chromedriver.direct_driver()
     same_ip_scrapes = 0
-
-    # registrar inicio en dashboard
-    dash.log(
-        card=card,
-        title=f"Soat ({subthread}) [Pendientes: {total_original}]",
-        status=1,
-        lastUpdate="Calculando ETA...",
-    )
 
     # iniciar variables para calculo de ETA
     tiempo_inicio = time.perf_counter()
     procesados = 0
+    eta = 0
 
     # iterar hasta vaciar la cola compartida con otras instancias del scraper
     while True:
-
         # intentar extraer siguiente registro de cola compartida
         try:
-            placa = queue_update_data.get_nowait()
+            record_item = queue_update_data.get_nowait()
+            placa = record_item
+
         except Empty:
             # log de salida del scraper
             dash.log(
                 card=card,
                 status=3,
+                title=f"SOATS-{subthread} [PROCESADOS: {procesados}]",
                 text="Inactivo",
-                lastUpdate=f"Fin: {dt.now()}",
+                lastUpdate=f"Fin: {dt.strftime(dt.now(),"%H:%M:%S")}",
             )
             break
 
         # se tiene un registro, intentar extraer la informacion
         try:
-            dash.log(card=card, text=f"Procesando: {placa}")
+            dash.log(
+                card=card,
+                title=f"SOATS-{subthread} [Pendientes: {total_original}]",
+                status=1,
+                text=f"Procesando: {placa}",
+                lastUpdate=f"ETA: {eta}",
+            )
 
             # si se esta llegando al limite con un mismo IP, reiniciar con IP nuevo
             if same_ip_scrapes > 10:
@@ -65,26 +66,48 @@ def gather(
                 webdriver = chromedriver.proxy_driver()
 
             # aumentar contador de usos del mismo IP y mandar a scraper
+            scraper_response = scraper.browser_wrapper(placa=placa, webdriver=webdriver)
             same_ip_scrapes += 1
-            soat_response = scraper.browser_wrapper(placa=placa, webdriver=webdriver)
+            procesados += 1
 
             # si respuesta es texto, hubo un error -- regresar
-            if isinstance(soat_response, str):
+            if isinstance(scraper_response, str):
                 dash.log(
                     card=card,
                     status=2,
-                    lastUpdate=f"ERROR: {soat_response}",
+                    lastUpdate=f"ERROR: {scraper_response}",
                 )
+                # devolver registro a la cola para que otro thread lo complete
+                if record_item is not None:
+                    queue_update_data.put(record_item)
+
+                # si error permite reinicio ("@") esperar 10 segundos y empezar otra vez
+                if "@" in scraper_response:
+                    dash.log(
+                        card=card,
+                        text="Reinicio en 10 segundos",
+                        status=1,
+                    )
+                    time.sleep(10)
+                    continue
+
+                # si error no permite reinicio, salir
                 break
 
-            # placa no genera resultados
-            if not soat_response:
+            # respuesta es en blanco
+            if not scraper_response:
                 with lock:
-                    local_response.append({"Empty": True, "PlacaValidate": placa})
-                    break
+                    local_response.append(
+                        {
+                            "Empty": True,
+                            "PlacaValidate": placa,
+                        }
+                    )
+                dash.log(action=f"[ SOATS ] {placa}")
+                continue
 
             # placa si tiene resultados
-            _n = date_to_db_format(data=soat_response)
+            _n = date_to_db_format(data=scraper_response)
             with lock:
                 local_response.append(
                     {
@@ -105,36 +128,33 @@ def gather(
                 )
 
             # calcular ETA aproximado
-            procesados += 1
             duracion_promedio = (time.perf_counter() - tiempo_inicio) / procesados
-            eta = dt.now() + td(
-                seconds=duracion_promedio
-                * (queue_update_data.qsize() // GATHER_ITERATIONS)
+            eta = dt.strftime(
+                dt.now()
+                + td(seconds=duracion_promedio * (total_original - procesados)),
+                "%H:%M:%S",
             )
 
-            # actualizar dashboard
-            dash.log(
-                card=card,
-                title=f"Soat ({subthread}) [Pendientes: {queue_update_data.qsize()//GATHER_ITERATIONS}]",
-                lastUpdate=f"ETA: {str(eta).split('.')[0]}",
-            )
-            dash.log(action=f"[ SOATS ] {_n[2]}")
+            dash.log(action=f"[ SOATS ] {placa}")
 
         except KeyboardInterrupt:
             quit()
 
         except Exception as e:
-            dash.log(card=card, text=f"Crash (Gather): {e}", status=2)
+            # devolver registro a la cola para que otro thread lo complete
+            if record_item is not None:
+                queue_update_data.put(record_item)
 
-    # log last action and close webdriver
-    dash.log(
-        card=card,
-        title="Certificados Soat",
-        progress=100,
-        status=3,
-        text="Inactivo",
-        lastUpdate=dt.now(),
-    )
+            # actualizar dashboard
+            dash.log(
+                card=card,
+                text=f"Crash (Gather): {str(e)[:55]}",
+                status=2,
+            )
+            break
+
+    # cerrar el driver antes de volver
+    webdriver.quit()
 
 
 def create_certificate(data):

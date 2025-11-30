@@ -10,6 +10,58 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 
+/**
+ * Updates a single element with new innerHTML content.
+ * @param {string} id - The ID of the HTML element to update.
+ * @param {string} content - The new content to set.
+ */
+function updateElementContent(id, content) {
+    const element = document.getElementById(id);
+    if (element) {
+        element.innerHTML = '';
+        const div = document.createElement('div');
+        div.innerHTML = content;
+        element.appendChild(div);
+    }
+}
+
+/**
+ * Updates the new Scrape Data table using an array of categories and columns.
+ * Assumes the data structure is: data.scrape_data[category][column].
+ * @param {object} data - The entire JSON data object fetched from the server.
+ */
+function updateScrapeData(data) {
+    // Definimos las categorías y las columnas según el HTML
+    const categories = [
+                    "DataMtcRecordsConductores",
+                    "DataMtcBrevetes",
+                    "DataSatMultas",
+                    "DataMtcRevisionesTecnicas",
+                    "DataSutranMultas",
+                    "DataSunarpFichas",
+                    "DataApesegSoats",
+                    "DataSatImpuestosCodigos"];
+    const columns = ['status', 'pendientes', 'eta', 'threads_activos'];
+
+    if (data.scrapers_kpis) {
+        categories.forEach(category => {
+            if (data.scrapers_kpis[category]) {
+                columns.forEach(column => {
+                    // Construye el ID en formato: scrape-columna-categoria
+                    const id = `scraperkpi-${column}-${category}`;
+                    const content = data.scrapers_kpis[category][column];
+                    
+                    // Aseguramos que el contenido exista antes de intentar actualizar
+                    if (content !== undefined) {
+                        updateElementContent(id, content);
+                    }
+                });
+            }
+        });
+    }
+}
+
+
 // updates dashboard regularly
 function updateDashboard() {
     fetch('/data')
@@ -53,63 +105,29 @@ function updateDashboard() {
                 }
             }
 
-            // Update KPIs
-            // We check if the element exists before updating to prevent errors
-            const kpi_placas = document.getElementById('kpi-active-threads');
-            if (kpi_placas) {
-                kpi_placas.innerHTML = '';
-                const div = document.createElement('div');
-                div.innerHTML = data.kpi_active_threads;
-                kpi_placas.appendChild(div);
-            }
+            // --- Update KPIs (Simplified and Consolidated) ---
+            const kpiIds = [
+                'kpi-active-threads',
+                'kpi-truecaptcha-balance',
+                'kpi-zeptomail-balance',
+                'kpi-twocaptcha-balance',
+                'kpi-brightdata-balance',
+                'kpi-googlecloud-balance',
+                'kpi-cloudfare-balance'
+            ];
 
-            const kpi_truecaptcha_balance = document.getElementById('kpi-truecaptcha-balance');
-            if (kpi_truecaptcha_balance) {
-                kpi_truecaptcha_balance.innerHTML = '';
-                const div = document.createElement('div');
-                div.innerHTML = data.kpi_truecaptcha_balance;
-                kpi_truecaptcha_balance.appendChild(div);
-            }
+            kpiIds.forEach(id => {
+                // Genera la clave JSON esperada (ej: kpi-active-threads -> kpi_active_threads)
+                const dataKey = id.replace(/-/g, '_'); 
+                if (data[dataKey]) {
+                    updateElementContent(id, data[dataKey]);
+                }
+            });
 
-            const kpi_zeptomail_balance = document.getElementById('kpi-zeptomail-balance');
-            if (kpi_zeptomail_balance) {
-                kpi_zeptomail_balance.innerHTML = '';
-                const div = document.createElement('div');
-                div.innerHTML = data.kpi_zeptomail_balance;
-                kpi_zeptomail_balance.appendChild(div);
-            }
-            
-            const kpi_twocaptcha_balance = document.getElementById('kpi-twocaptcha-balance');
-            if (kpi_twocaptcha_balance) {
-                kpi_twocaptcha_balance.innerHTML = '';
-                const div = document.createElement('div');
-                div.innerHTML = data.kpi_twocaptcha_balance;
-                kpi_twocaptcha_balance.appendChild(div);
-            }
-            
-            const kpi_brightdata_balance = document.getElementById('kpi-brightdata-balance');
-            if (kpi_brightdata_balance) {
-                kpi_brightdata_balance.innerHTML = '';
-                const div = document.createElement('div');
-                div.innerHTML = data.kpi_brightdata_balance;
-                kpi_brightdata_balance.appendChild(div);
-            }
-            
-            const kpi_googlecloud_balance = document.getElementById('kpi-googlecloud-balance');
-            if (kpi_googlecloud_balance) {
-                kpi_googlecloud_balance.innerHTML = '';
-                const div = document.createElement('div');
-                div.innerHTML = data.kpi_googlecloud_balance;
-                kpi_googlecloud_balance.appendChild(div);
-            }
-            
-            const kpi_cloudfare_balance = document.getElementById('kpi-cloudfare-balance');
-            if (kpi_cloudfare_balance) {
-                kpi_cloudfare_balance.innerHTML = '';
-                const div = document.createElement('div');
-                div.innerHTML = data.kpi_cloudfare_balance;
-                kpi_cloudfare_balance.appendChild(div);
-            }
+            // --- Update New Scrape Data Table ---
+            // Llama a la función para actualizar la nueva tabla de procesos
+            updateScrapeData(data);
+
 
             const bottom_left = document.getElementById('activities-text-area');
             if (bottom_left && data.bottom_left) {
@@ -120,5 +138,5 @@ function updateDashboard() {
         .catch(error => console.error('Error updating dashboard:', error));
 }
 
-setInterval(updateDashboard, 2500);
+setInterval(updateDashboard, 1000);
 updateDashboard();

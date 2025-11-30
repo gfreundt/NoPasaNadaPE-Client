@@ -1,103 +1,131 @@
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as td
 from queue import Empty
+import time
 
 # local imports
 from src.scrapers import scrape_recvehic
+from src.utils.webdriver import ChromeUtils
+from src.utils.constants import HEADLESS
 
 
-def gather(dash, queue_update_data, local_response, total_original, lock):
+def gather(
+    dash, queue_update_data, local_response, total_original, lock, card, subthread
+):
 
-    CARD = 1
+    # construir webdriver con parametros especificos
+    chromedriver = ChromeUtils(headless=HEADLESS["revtec"])
+    webdriver = chromedriver.direct_driver()
 
-    # log first action
-    dash.log(
-        card=CARD,
-        title=f"Record Conductor [{total_original}]",
-        status=1,
-        progress=0,
-        text="Inicializando",
-        lastUpdate="Actualizado:",
-    )
+    # iniciar variables para calculo de ETA
+    tiempo_inicio = time.perf_counter()
+    procesados = 0
+    eta = 0
 
-    # iterate on all records that require updating and get scraper results
-    while not queue_update_data.empty():
+    # iterar hasta vaciar la cola compartida con otras instancias del scraper
+    while True:
 
-        # grab next record from update queue unless empty
+        # intentar extraer siguiente registro de cola compartida
         try:
-            id_member, doc_tipo, doc_num = queue_update_data.get_nowait()
+            record_item = queue_update_data.get_nowait()
+            id_member, doc_tipo, doc_num = record_item
         except Empty:
+            dash.log(
+                card=card,
+                title=f"Record Vehicular-{subthread} [PROCESADOS: {procesados}]",
+                status=3,
+                text="Inactivo",
+                lastUpdate=f"Fin: {dt.strftime(dt.now(),"%H:%M:%S")}",
+            )
             break
-
-        # records are only available for members with DNI
-        if doc_tipo != "DNI":
-            continue
 
         # loop to catch scraper errors and retry limited times
         try:
-            # log action
-            dash.log(card=CARD, text=f"Procesando: {doc_tipo} {doc_num}")
+            # registrar inicio en dashboard
+            dash.log(
+                card=card,
+                title=f"Record Vehicular-{subthread} [Pendientes: {total_original-procesados}]",
+                status=1,
+                text=f"Procesando: {doc_tipo} {doc_num}",
+                lastUpdate=f"ETA: {eta}",
+            )
 
-            # send request to scraper
-            pdf_bytes = scrape_recvehic.browser(doc_num=doc_num)
+            # enviar registro a scraper
+            scraper_response = scrape_recvehic.browser_wrapper(
+                doc_num=doc_num, webdriver=webdriver, lock=lock
+            )
+            procesados += 1
 
-            # update memberLastUpdate table with last update information
-            _now = dt.now().strftime("%Y-%m-%d")
-
-            # response from scraper is that there is no record
-            if pdf_bytes == -1:
-                with lock:
-                    local_response.append({"Empty": True, "IdMember_FK": id_member})
-
-            # response from scraper is some error in process
-            elif len(pdf_bytes) < 40:
+            # si respuesta es texto, hubo un error -- regresar
+            if isinstance(scraper_response, str) and len(scraper_response) < 100:
                 dash.log(
-                    card=CARD,
+                    card=card,
                     status=2,
-                    text=f"|ERROR| Proceso Incompleto: {pdf_bytes}",
-                    lastUpdate=dt.now(),
+                    lastUpdate=f"ERROR: {scraper_response}",
                 )
-                return
+                # devolver registro a la cola para que otro thread lo complete
+                if record_item is not None:
+                    queue_update_data.put(record_item)
 
-            # add response
+                # si error permite reinicio ("@") esperar 10 segundos y empezar otra vez
+                if "@" in scraper_response:
+                    dash.log(
+                        card=card,
+                        text="Reinicio en 10 segundos",
+                        status=1,
+                    )
+                    time.sleep(10)
+                    continue
+
+                # si error no permite reinicio, salir
+                break
+
+            # respuesta es en blanco
+            if not scraper_response:
+                with lock:
+                    local_response.append(
+                        {
+                            "Empty": True,
+                            "IdMember_FK": id_member,
+                        }
+                    )
+                dash.log(action=f"[ RECVEHIC ] {doc_tipo} {doc_num}")
+                continue
+
+            # contruir respuesta
             with lock:
                 local_response.append(
                     {
                         "IdMember_FK": id_member,
-                        "ImageBytes": pdf_bytes,
-                        "LastUpdate": _now,
+                        "ImageBytes": scraper_response,
+                        "LastUpdate": dt.now().strftime("%Y-%m-%d"),
                     }
                 )
 
-            # update dashboard with progress, last update timestamp and details of scraped data
-            dash.log(
-                card=CARD,
-                progress=int(
-                    ((total_original - queue_update_data.qsize()) / total_original)
-                    * 100
-                ),
-                lastUpdate=dt.now(),
+            # calcular ETA aproximado
+            duracion_promedio = (time.perf_counter() - tiempo_inicio) / procesados
+            eta = dt.strftime(
+                dt.now()
+                + td(seconds=duracion_promedio * (total_original - procesados)),
+                "%H:%M:%S",
             )
-            dash.log(
-                action=f"[ RECVEHIC ] {'|'.join([str(i) for i in local_response[-1].values()])}"
-            )
+
+            dash.log(action=f"[ RECVEHIC ] {doc_tipo} {doc_num}")
 
         except KeyboardInterrupt:
             quit()
 
-        except Exception:
-            dash.log(
-                card=CARD,
-                status=2,
-                text="|ERROR| Proceso Incompleto.",
-            )
-            return
+        except Exception as e:
+            # devolver registro a la cola para que otro thread lo complete
+            if record_item is not None:
+                queue_update_data.put(record_item)
 
-    # log last action
-    dash.log(
-        card=CARD,
-        title="Record del Conductor",
-        progress=100,
-        status=3,
-        text="Inactivo",
-        lastUpdate=dt.now(),
-    )
+            # actualizar dashboard
+            dash.log(
+                card=card,
+                text=f"Crash (Gather): {str(e)[:55]}",
+                status=2,
+            )
+            break
+
+    # cerrar el driver antes de volver
+    webdriver.quit()
