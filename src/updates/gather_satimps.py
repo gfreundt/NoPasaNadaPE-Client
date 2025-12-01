@@ -9,7 +9,7 @@ from src.utils.webdriver import ChromeUtils
 from src.utils.constants import HEADLESS, GATHER_ITERATIONS
 
 
-def manage_sub_threads(dash, update_data, full_response):
+def manage_sub_threads(dash, lock, update_data, full_response):
 
     # create variable that accumulates all sub-thread responses
     local_response_codigos, local_response_deudas = [], []

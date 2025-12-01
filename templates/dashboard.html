@@ -12,212 +12,208 @@
 <body>
     <div class="container-fluid p-3">
 
-    <div class="row">
-        <div class="col-lg-8">
-            
-            <div class="row mb-4" id="cards-container">
-                {% for i in range(32) %}
-                <div class="col-6 col-md-3 mb-2 px-1">
-                    <div class="card status-0 h-100" id="card-{{ i }}">
-                        <div class="card-body p-2">
-                            <h6 class="card-title d-flex justify-content-between align-items-center mb-1" style="font-size: 0.85rem;">
-                                <span id="card-title-{{ i }}" class="text-truncate">Process {{ i+1 }}</span>
-                                <i id="card-icon-{{ i }}" class="bi" style="font-size: 0.85rem;"></i>
-                            </h6>
-                            <p class="card-text small mb-0" id="card-text-{{ i }}" style="font-size: 0.75rem;">Status: Idle</p>
-                            <p class="mb-0 small" style="font-size: 0.75rem;"><strong id="card-status-label-{{ i }}">Inactive</strong></p>
+        <div class="row">
+        
+            <div class="col-lg-8">
+                
+                <div class="row mb-4" id="cards-container">
+                    {% for i in range(32) %}
+                    <div class="col-6 col-md-3 mb-2 px-1">
+                        <div class="card status-0 h-100" id="card-{{ i }}">
+                            <div class="card-body p-2">
+                                <h6 class="card-title d-flex justify-content-between align-items-center mb-1" style="font-size: 0.85rem;">
+                                    <span id="card-title-{{ i }}" class="text-truncate">Process {{ i+1 }}</span>
+                                    <i id="card-icon-{{ i }}" class="bi" style="font-size: 0.85rem;"></i>
+                                </h6>
+                                <p class="card-text small mb-0" id="card-text-{{ i }}" style="font-size: 0.75rem;">Status: Idle</p>
+                                <p class="mb-0 small" style="font-size: 0.75rem;"><strong id="card-status-label-{{ i }}">Inactive</strong></p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-12 px-1">
+                        <div class="p-3 border rounded shadow-sm bg-white">
+                            <h6 class="fw-bold mb-2 text-center" style="font-size: 1.3rem;">Estado de Scrapers</h6>
+                            <table class="table table-bordered table-sm text-center mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 20%;">Categoría</th>
+                                        <th style="width: 10%;">Status</th>
+                                        <th style="width: 10%;">Pendientes</th>
+                                        <th style="width: 30%;">ETA</th>
+                                        <th style="width: 30%;">Trabajadores Activos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="text-end pe-2">DataMtcBrevetes</td>
+                                        <td id="scraperkpi-status-DataMtcBrevetes"></td>
+                                        <td id="scraperkpi-pendientes-DataMtcBrevetes"></td>
+                                        <td id="scraperkpi-eta-DataMtcBrevetes"></td>
+                                        <td id="scraperkpi-threads_activos-DataMtcBrevetes"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end pe-2">DataMtcRecordsConductores</td>
+                                        <td id="scraperkpi-status-DataMtcRecordsConductores"></td>
+                                        <td id="scraperkpi-pendientes-DataMtcRecordsConductores"></td>
+                                        <td id="scraperkpi-eta-DataMtcRecordsConductores"></td>
+                                        <td id="scraperkpi-threads_activos-DataMtcRecordsConductores"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end pe-2">DataMtcRevisionesTecnicas</td>
+                                        <td id="scraperkpi-status-DataMtcRevisionesTecnicas"></td>
+                                        <td id="scraperkpi-pendientes-DataMtcRevisionesTecnicas"></td>
+                                        <td id="scraperkpi-eta-DataMtcRevisionesTecnicas"></td>
+                                        <td id="scraperkpi-threads_activos-DataMtcRevisionesTecnicas"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end pe-2">DataSatImpuestos</td>
+                                        <td id="scraperkpi-status-satimp"></td>
+                                        <td id="scraperkpi-pendientes-satimp"></td>
+                                        <td id="scraperkpi-eta-satimp"></td>
+                                        <td id="scraperkpi-threads_activos-satimp"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end pe-2">DataSatMultas</td>
+                                        <td id="scraperkpi-status-DataSatMultas"></td>
+                                        <td id="scraperkpi-pendientes-DataSatMultas"></td>
+                                        <td id="scraperkpi-eta-DataSatMultas"></td>
+                                        <td id="scraperkpi-threads_activos-DataSatMultas"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end pe-2">DataApesegSoats</td>
+                                        <td id="scraperkpi-status-DataApesegSoats"></td>
+                                        <td id="scraperkpi-pendientes-DataApesegSoats"></td>
+                                        <td id="scraperkpi-eta-DataApesegSoats"></td>
+                                        <td id="scraperkpi-threads_activos-DataApesegSoats"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end pe-2">DataSunarpFichas</td>
+                                        <td id="scraperkpi-status-DataSunarpFichas"></td>
+                                        <td id="scraperkpi-pendientes-DataSunarpFichas"></td>
+                                        <td id="scraperkpi-eta-DataSunarpFichas"></td>
+                                        <td id="scraperkpi-threads_activos-DataSunarpFichas"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end pe-2">DataSutranMultas</td>
+                                        <td id="scraperkpi-status-DataSutranMultas"></td>
+                                        <td id="scraperkpi-pendientes-DataSutranMultas"></td>
+                                        <td id="scraperkpi-eta-DataSutranMultas"></td>
+                                        <td id="scraperkpi-threads_activos-DataSutranMultas"></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end pe-2">Consolidado</td>
+                                        <td id="scraperkpi-status-extra"></td>
+                                        <td id="scraperkpi-pendientes-extra"></td>
+                                        <td id="scraperkpi-eta-extra"></td>
+                                        <td id="scraperkpi-threads_activos-extra"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
-                {% endfor %}
-            </div>
 
-            <div class="row mb-4">
-                <div class="col-12 px-1">
-                    <div class="p-3 border rounded shadow-sm bg-white">
-                        <table class="table table-bordered table-sm text-center mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>nopasanadape.com</th>
-                                    <th>Saldo Truecaptcha</th>
-                                    <th>Saldo Zeptomail</th>
-                                    <th>Saldo 2Captcha</th>
-                                    <th>Saldo BrightData</th>
-                                    <th>Proyeccion Google Cloud</th>
-                                    <th>Status Cloudfare</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td id="kpi-nopasanadape-status"></td>
-                                    <td id="kpi-truecaptcha-balance"></td>
-                                    <td id="kpi-zeptomail-balance"></td>
-                                    <td id="kpi-twocaptcha-balance"></td>
-                                    <td id="kpi-brightdata-balance"></td>
-                                    <td id="kpi-googlecloud-balance"></td>
-                                    <td id="kpi-cloudfare-status"></td>
-                                </tr>
-                            </tbody>
-                        </table>
+                <div class="row mb-4">
+                    <div class="col-12 px-1">
+                        <div class="p-3 border rounded shadow-sm bg-white">
+                            <table class="table table-bordered table-sm text-center mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>nopasanadape.com</th>
+                                        <th>Saldo Truecaptcha</th>
+                                        <th>Saldo Zeptomail</th>
+                                        <th>Saldo 2Captcha</th>
+                                        <th>Saldo BrightData</th>
+                                        <th>Proyeccion Google Cloud</th>
+                                        <th>Status Cloudfare</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td id="kpi-nopasanadape-status"></td>
+                                        <td id="kpi-truecaptcha-balance"></td>
+                                        <td id="kpi-zeptomail-balance"></td>
+                                        <td id="kpi-twocaptcha-balance"></td>
+                                        <td id="kpi-brightdata-balance"></td>
+                                        <td id="kpi-googlecloud-balance"></td>
+                                        <td id="kpi-cloudfare-status"></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="row mb-4">
-                <div class="col-12 px-1">
-                    <div class="p-3 border rounded shadow-sm bg-white">
-                        <h6 class="fw-bold mb-2 text-center" style="font-size: 1.3rem;">Estado de Scrapers</h6>
-                        <table class="table table-bordered table-sm text-center mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 20%;">Categoría</th>
-                                    <th style="width: 10%;">Status</th>
-                                    <th style="width: 10%;">Pendientes</th>
-                                    <th style="width: 30%;">ETA</th>
-                                    <th style="width: 30%;">Última Actividad</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="text-end pe-2">DataMtcBrevetes</td>
-                                    <td id="scraperkpi-status-DataMtcBrevetes"></td>
-                                    <td id="scraperkpi-pendientes-DataMtcBrevetes"></td>
-                                    <td id="scraperkpi-ETA-DataMtcBrevetes"></td>
-                                    <td id="scraperkpi-threads_activos-DataMtcBrevetes"></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-end pe-2">DataMtcRecordsConductores</td>
-                                    <td id="scraperkpi-status-DataMtcRecordsConductores"></td>
-                                    <td id="scraperkpi-pendientes-DataMtcRecordsConductores"></td>
-                                    <td id="scraperkpi-ETA-DataMtcRecordsConductores"></td>
-                                    <td id="scraperkpi-threads_activos-DataMtcRecordsConductores"></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-end pe-2">DataMtcRevisionesTecnicas</td>
-                                    <td id="scraperkpi-status-DataMtcRevisionesTecnicas"></td>
-                                    <td id="scraperkpi-pendientes-DataMtcRevisionesTecnicas"></td>
-                                    <td id="scraperkpi-ETA-DataMtcRevisionesTecnicas"></td>
-                                    <td id="scraperkpi-threads_activos-DataMtcRevisionesTecnicas"></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-end pe-2">DataSatImpuestos</td>
-                                    <td id="scraperkpi-status-satimp"></td>
-                                    <td id="scraperkpi-pendientes-satimp"></td>
-                                    <td id="scraperkpi-ETA-satimp"></td>
-                                    <td id="scraperkpi-threads_activos-satimp"></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-end pe-2">DataSatMultas</td>
-                                    <td id="scraperkpi-status-DataSatMultas"></td>
-                                    <td id="scraperkpi-pendientes-DataSatMultas"></td>
-                                    <td id="scraperkpi-ETA-DataSatMultas"></td>
-                                    <td id="scraperkpi-threads_activos-DataSatMultas"></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-end pe-2">DataApesegSoats</td>
-                                    <td id="scraperkpi-status-DataApesegSoats"></td>
-                                    <td id="scraperkpi-pendientes-DataApesegSoats"></td>
-                                    <td id="scraperkpi-ETA-DataApesegSoats"></td>
-                                    <td id="scraperkpi-threads_activos-DataApesegSoats"></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-end pe-2">DataSunarpFichas</td>
-                                    <td id="scraperkpi-status-DataSunarpFichas"></td>
-                                    <td id="scraperkpi-pendientes-DataSunarpFichas"></td>
-                                    <td id="scraperkpi-ETA-DataSunarpFichas"></td>
-                                    <td id="scraperkpi-threads_activos-DataSunarpFichas"></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-end pe-2">DataSutranMultas</td>
-                                    <td id="scraperkpi-status-DataSutranMultas"></td>
-                                    <td id="scraperkpi-pendientes-DataSutranMultas"></td>
-                                    <td id="scraperkpi-ETA-DataSutranMultas"></td>
-                                    <td id="scraperkpi-threads_activos-DataSutranMultas"></td>
-                                </tr>
-                                <tr>
-                                    <td class="text-end pe-2">Extra</td>
-                                    <td id="scraperkpi-status-extra"></td>
-                                    <td id="scraperkpi-pendientes-extra"></td>
-                                    <td id="scraperkpi-ETA-extra"></td>
-                                    <td id="scraperkpi-threads_activos-extra"></td>
-                                </tr>
-                            </tbody>
-                        </table>
+            </div> <div class="col-lg-4 d-flex flex-column">
+                
+                <div class="p-3 border rounded shadow-sm bg-white mb-3 flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold">Logs</span>
+                        <button id="clear-btn" class="btn btn-sm text-white" style="background-color: #39e75f;">Limpiar</button>
+                    </div>
+                    <textarea id="activities-text-area" class="form-control" style="resize: vertical; height: 800px; font-size: 12px;" placeholder="Esperando Comando..." readonly></textarea>
+                </div>
+
+                <div class="p-3 border rounded shadow-sm bg-white">
+                    <div class="row g-1">
+                        <div class="col-4">
+                            <div class="text-center fw-bold mb-2 small">Alertas</div>
+                            <form method="POST" action="/datos_alertas" class="mb-2">
+                                <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Datos</button>
+                            </form>
+                            <form method="POST" action="/actualizar" class="mb-2">
+                                <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Actualizar</button>
+                            </form>
+                            <form method="POST" action="/generar_alertas" class="mb-2">
+                                <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Generar</button>
+                            </form>
+                            <form method="POST" action="/enviar_mensajes" class="mb-2">
+                                <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Enviar</button>
+                            </form>
+                        </div>
+
+                        <div class="col-4">
+                            <div class="text-center fw-bold mb-2 small">Boletines</div>
+                            <form method="POST" action="/datos_boletines" class="mb-2">
+                                <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Datos</button>
+                            </form>
+                            <form method="POST" action="/actualizar" class="mb-2">
+                                <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Actualizar</button>
+                            </form>
+                            <form method="POST" action="/generar_boletines" class="mb-2">
+                                <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Generar</button>
+                            </form>
+                            <form method="POST" action="/enviar_mensajes" class="mb-2">
+                                <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Enviar</button>
+                            </form>
+                        </div>
+
+                        <div class="col-4">
+                            <div class="text-center fw-bold mb-2 small">Sistema</div>
+                            <form method="POST" action="/test" class="mb-2">
+                                <button type="submit" class="btn btn-success w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Server Test</button>
+                            </form>
+                            <form method="POST" action="/logs" class="mb-2">
+                                <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Logs (100)</button>
+                            </form>
+                            <form method="POST" action="/db_info" class="mb-2">
+                                <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">DB Info</button>
+                            </form>
+                            <form method="POST" action="/db_backup" class="mb-2">
+                                <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">DB Backup</button>
+                            </form>
+                            <form method="POST" action="/actualizar_de_json" class="mb-2">
+                                <button type="submit" class="btn btn-danger w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Actualizar JSON</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-        </div>
-
-        <div class="col-lg-4 d-flex flex-column">
-            
-            <div class="p-3 border rounded shadow-sm bg-white mb-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-bold">Logs</span>
-                    <button id="clear-btn" class="btn btn-sm text-white" style="background-color: #39e75f;">Limpiar</button>
-                </div>
-                <textarea id="activities-text-area" class="form-control" style="resize: vertical; height: 700px; font-size: 12px;" placeholder="Esperando Comando..." readonly></textarea>
-            </div>
-
-            <div class="p-3 border rounded shadow-sm bg-white">
-                <div class="row g-1">
-                    <div class="col-4">
-                        <div class="text-center fw-bold mb-2 small">Alertas</div>
-                        <form method="POST" action="/datos_alertas" class="mb-2">
-                            <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Datos</button>
-                        </form>
-                        <form method="POST" action="/actualizar" class="mb-2">
-                            <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Actualizar</button>
-                        </form>
-                        <form method="POST" action="/generar_alertas" class="mb-2">
-                            <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Generar</button>
-                        </form>
-                        <form method="POST" action="/enviar_mensajes" class="mb-2">
-                            <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Enviar</button>
-                        </form>
-                    </div>
-
-                    <div class="col-4">
-                        <div class="text-center fw-bold mb-2 small">Boletines</div>
-                        <form method="POST" action="/datos_boletines" class="mb-2">
-                            <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Datos</button>
-                        </form>
-                        <form method="POST" action="/actualizar" class="mb-2">
-                            <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Actualizar</button>
-                        </form>
-                        <form method="POST" action="/generar_boletines" class="mb-2">
-                            <button type="submit" class="btn btn-outline-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Generar</button>
-                        </form>
-                        <form method="POST" action="/enviar_mensajes" class="mb-2">
-                            <button type="submit" class="btn btn-primary w-100 btn-sm p-1" style="font-size: 0.7rem;">Enviar</button>
-                        </form>
-                    </div>
-
-                    <div class="col-4">
-                        <div class="text-center fw-bold mb-2 small">Sistema</div>
-                        <form method="POST" action="/test" class="mb-2">
-                            <button type="submit" class="btn btn-success w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Server Test</button>
-                        </form>
-                        <form method="POST" action="/logs" class="mb-2">
-                            <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Logs (100)</button>
-                        </form>
-                        <form method="POST" action="/db_info" class="mb-2">
-                            <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">DB Info</button>
-                        </form>
-                        <form method="POST" action="/db_backup" class="mb-2">
-                            <button type="submit" class="btn btn-warning w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">DB Backup</button>
-                        </form>
-                        <form method="POST" action="/actualizar_de_json" class="mb-2">
-                            <button type="submit" class="btn btn-danger w-100 text-dark btn-sm p-1" style="font-size: 0.7rem;">Actualizar JSON</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-    </div>
+            </div> </div> </div>
 
 <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 

@@ -1,6 +1,5 @@
 from flask import Flask, render_template, jsonify, redirect
 import threading
-import inspect
 import logging
 from copy import deepcopy as copy
 import os
@@ -10,7 +9,7 @@ import subprocess
 import json
 from collections import deque
 import time
-from src.monitor import settings, auto_scraper
+from src.monitor import settings, auto_scraper, cronograma
 from src.utils import maintenance
 from src.utils.utils import get_local_ip, check_vpn_online
 from src.utils.constants import (
@@ -18,58 +17,17 @@ from src.utils.constants import (
     UPDATER_TOKEN,
     SERVER_IP,
     SERVER_IP_TEST,
+    TABLAS_BD,
 )
 from src.updates import gather_all
 from src.test import tests
 from src.monitor import update_kpis
+import schedule
 
 from pprint import pprint
 
 
 logging.getLogger("werkzeug").disabled = True
-
-
-class ThreadMonitor:
-    def __init__(self, include_prefixes=None, include_files=None, interval=1):
-
-        self.include_prefixes = include_prefixes or []
-        self.include_files = include_files or []
-        self.interval = interval
-
-    def is_user_thread(self, thread):
-        return True
-        """Return True only if the thread matches your filters."""
-
-        # 1. Filter by thread name prefix (recommended)
-        if self.include_prefixes:
-            if any(thread.name.startswith(p) for p in self.include_prefixes):
-                return True
-
-        # 2. Filter by file where the thread target function lives
-        if self.include_files:
-            target = getattr(thread, "_target", None)
-            if target:
-                try:
-                    file = inspect.getsourcefile(target) or ""
-                except Exception:
-                    file = ""
-                if any(x in file for x in self.include_files):
-                    return True
-
-        return False
-
-    def start(self):
-        def run():
-            while True:
-                self.user_threads = [
-                    t for t in threading.enumerate() if self.is_user_thread(t)
-                ]
-                time.sleep(self.interval)
-
-        monitor_thread = threading.Thread(
-            target=run, name="ThreadMonitorDaemon", daemon=True
-        )
-        monitor_thread.start()
 
 
 class Dashboard:
@@ -81,20 +39,24 @@ class Dashboard:
         )
         self.data_lock = threading.Lock()
         self.url = f"{SERVER_IP_TEST if test else SERVER_IP}/update"
-        self.log_entries = deque(maxlen=55)
-        self.data = {"activities": ""}
-        self.thread_monitor = ThreadMonitor()
-        self.thread_monitor.start()
-        self.assigned_cards = []
 
         # definir rutas de flask
         settings.set_routes(self)
 
+        # crear estrcutura de variables y valores iniciales
         self.set_initial_data()
-        self.update_kpis()
+
+        # iniciar en thread paralelo
+        self.iniciar_actualizador_kpis()
+
+        # iniciar cronogramas
+        self.iniciar_cron()
 
     def set_initial_data(self):
-        empty_card = {
+        self.log_entries = deque(maxlen=55)
+        self.assigned_cards = []
+
+        _empty_card = {
             "title": "No Asignado",
             "progress": 0,
             "msg": [],
@@ -103,12 +65,37 @@ class Dashboard:
             "lastUpdate": "Pendiente",
         }
         self.data = {
+            "activities": "",
             "top_left": "No Pasa Nada Dashboard",
             "top_right": {"content": "Inicializando...", "status": 0},
-            "cards": [copy(empty_card) for _ in range(32)],
+            "cards": [copy(_empty_card) for _ in range(32)],
             "bottom_left": [],
             "bottom_right": [],
+            "scrapers_kpis": {
+                update_key: {
+                    "status": "INACTIVO",
+                    "pendientes": "",
+                    "eta": "",
+                    "threads_activos": "",
+                }
+                for update_key in TABLAS_BD + "extra"
+            },
         }
+
+    def iniciar_actualizador_kpis(self):
+        """
+        actualiza informacion de vigencia/saldo de servicios de terceros
+        """
+        t = threading.Thread(target=update_kpis.main, args=(self,), daemon=True)
+        t.start()
+        self.log(action="[ SERVICIO ] Actualizado de KPIs activo.")
+
+    def iniciar_cron(self):
+        """
+        activa todos los procesos que corren en cronograma en un thread paralelo
+        """
+        t = threading.Thread(target=cronograma.main, args=(self,), daemon=True)
+        t.start()
 
     def log(self, **kwargs):
         if "general_status" in kwargs:
@@ -133,25 +120,12 @@ class Dashboard:
             if len(self.data["bottom_left"]) > 30:
                 self.data["bottom_left"].pop(0)
 
-        # any time there is an action, update kpis
-        self.update_kpis()
-
-    def update_kpis(self):
-        """
-        actualiza informacion de vigencia/saldo de servicios de terceros
-        """
-        kpis = update_kpis.main()
-        self.data.update(kpis)
-        # status = update_scraper_status.main(self.das)
-        # self.data.update(status)
-
     # -------- ACCION DE URL DE INGRESO --------
     def dashboard(self):
         return render_template("dashboard.html")
 
     # ------- ACCIONES DE APIS (INTERNO) -------
     def auto_scraper(self):
-        print(f"********* AUTOSCRAPER TRIGGERED {dt.now()}")
         self.auto_scraper_continue_flag = True
         auto_scraper.main(self)
         return redirect("/")
@@ -197,8 +171,6 @@ class Dashboard:
             self.log(
                 action="[ ACTUALIZACION ] ERROR - VPN no esta en linea.",
             )
-            # cambiar flag para detener autoscraper si solicitud de actualizar vino de ahi
-            self.auto_scraper_continue_flag = True
 
             return redirect("/")
 
@@ -212,6 +184,7 @@ class Dashboard:
             scraper_responses = gather_all.gather_threads(
                 dash=self, all_updates=self.actualizar_datos.json()
             )
+
             _json = {
                 "token": UPDATER_TOKEN,
                 "instruction": "do_updates",
@@ -389,5 +362,6 @@ class Dashboard:
         return flask_thread
 
     def runx(self):
-        print(f"MONITOR RUNNING ON: http://{get_local_ip()}:7400")
+        # print(f"MONITOR RUNNING ON: http://{get_local_ip()}:7400")
+        print("MONITOR RUNNING ON: http://localhost:7400/")
         self.app.run(debug=False, threaded=True, host="0.0.0.0", port=7400)

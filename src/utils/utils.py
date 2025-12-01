@@ -3,14 +3,22 @@ import os
 import re
 import time
 import requests
+from requests.exceptions import Timeout, ConnectionError, RequestException
 import base64
 import socket
 import random
+import json
+
 
 # import pyautogui
 # from pyautogui import ImageNotFoundException
 from selenium.webdriver.common.by import By
-from src.utils.constants import MONTHS_3_LETTERS, NETWORK_PATH, TWOCAPTCHA_API_KEY
+from src.utils.constants import (
+    MONTHS_3_LETTERS,
+    NETWORK_PATH,
+    TWOCAPTCHA_API_KEY,
+    PUSHBULLET_API_TOKEN,
+)
 
 
 def date_to_db_format(data):
@@ -182,6 +190,32 @@ def base64_to_image(base64_string, output_path):
         print(f"An error occurred (base64_to_image): {e}")
 
 
+def send_pushbullet(title, message=""):
+
+    # do not accept blank title
+    if not title:
+        return False
+
+    API_URL = "https://api.pushbullet.com/v2/pushes"
+    payload = {"type": "note", "title": title, "body": message}
+
+    try:
+        response = requests.post(
+            API_URL,
+            data=json.dumps(payload),
+            headers={"Content-Type": "application/json"},
+            auth=(PUSHBULLET_API_TOKEN, ""),
+        )
+
+        if response.status_code == 200:
+            return True
+        else:
+            return False
+
+    except (Timeout, ConnectionError, RequestException):
+        return False
+
+
 def get_local_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(("8.8.8.8", 1))  # connect() for UDP doesn't send packets
@@ -203,10 +237,10 @@ def get_public_ip():
 def check_vpn_online():
     """
     Revisa si el VPN esta en linea.
-    Si el Network Prefix del IP no es el usual usado por el VPN, retorna False
+    Si el Network Prefix del IP es diferente a del ISP, retorna True
     """
     current_ip = get_public_ip()
-    if current_ip and current_ip[:3] == "198":
+    if current_ip and current_ip[:3] != "181":
         return True
 
 

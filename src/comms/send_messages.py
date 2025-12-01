@@ -95,7 +95,7 @@ def send(db, dash, max=9999):
             dash.log(action=f"[ SEND ] | {msg['to']}")
 
         else:
-            print(f"ERROR sending email to {msg['to']}.")
+            dash.log(action=f"ERROR sending email to {msg['to']}.")
 
         counter += 1
 

@@ -143,5 +143,4 @@ def gather(
             break
 
     # cerrar driver
-    print(local_response)
     webdriver.quit()
