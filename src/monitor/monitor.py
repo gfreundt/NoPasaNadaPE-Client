@@ -78,7 +78,7 @@ class Dashboard:
                     "eta": "",
                     "threads_activos": "",
                 }
-                for update_key in TABLAS_BD + "extra"
+                for update_key in TABLAS_BD
             },
         }
 

@@ -63,6 +63,9 @@ TWOCAPTCHA_API_KEY = "852d1d8f6c105fbc6b5d86abed7a2370"
 GC_BILLING_ACCOUNT_ID = "012345-67890A-BCDEF0"  # FAKE!
 GC_BUDGET_ID = "projects/123456789012/budgets/MyMonthlyBudget"  # FAKE!
 
+# pushbullet
+PUSHBULLET_API_TOKEN = "o.BMp5HNWSPNMS8Gbqsufntv94feuklPMg"
+
 # 3-letter months
 MONTHS_3_LETTERS = (
     "Ene",
@@ -94,6 +97,19 @@ HEADLESS = {
     "sunat": True,
     "sutran": True,
 }
+
+# nombre de tablas
+TABLAS_BD = {
+    "DataMtcRecordsConductores",
+    "DataMtcBrevetes",
+    "DataSatMultas",
+    "DataSatImpuestos",
+    "DataMtcRevisionesTecnicas",
+    "DataSutranMultas",
+    "DataSunarpFichas",
+    "DataApesegSoats",
+}
+
 
 SCRAPER_TIMEOUT = {
     "brevetes": 60,
