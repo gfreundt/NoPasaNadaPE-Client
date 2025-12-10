@@ -10,7 +10,14 @@ def main():
     # ejecutar mantenimiento previo al inicio
     maintenance.pre()
 
-    dash = monitor.Dashboard(test="TEST" in "".join(sys.argv).upper())
+    if "TEST" in "".join(sys.argv).upper():
+        param = "TEST"
+    elif "DEV" in "".join(sys.argv).upper():
+        param = "DEV"
+    else:
+        param = "PROD"
+
+    dash = monitor.Dashboard(param)
     dash.runx()
 
 

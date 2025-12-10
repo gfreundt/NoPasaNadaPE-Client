@@ -1,7 +1,6 @@
 from threading import Thread
 from jinja2 import Environment, FileSystemLoader
 from src.utils.email import Email
-from src.utils.constants import ZOHO_INFO_PASSWORD
 
 
 def send_code(codigo, correo, nombre):

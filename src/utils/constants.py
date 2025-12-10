@@ -8,8 +8,10 @@ if platform.system() == "Linux":
 elif platform.system() == "Windows":
     NETWORK_PATH = os.path.join("d:", r"\pythonCode", "NoPasaNadaPE-Client")
 
-DB_NETWORK_PATH = os.path.join(NETWORK_PATH, "data", "members.db")
-DB_LOCAL_PATH = os.path.join("data", "members.db")
+
+SERVER_IP_TEST = "http://localhost:5000"
+SERVER_IP = "https://www.nopasanadape.com"
+SERVER_IP_DEV = "https://dev.nopasanadape.com"
 
 
 # security tokens
@@ -19,25 +21,9 @@ CucL7iimU7P57OMdXsVPGnf8KdEHeX7r+1+V1KSSFPRFOPlBixsxNurtUKG7jNpvn/MqRJ
 """
 API_TOKEN_MAQUINARIAS = "6f1a9d4b27c3e8a0f5b19c2d43e7a8d1"
 
-
-SERVER_IP_TEST = "http://localhost:5000"
-# SERVER_IP = "http://10.128.0.2:5000"
-SERVER_IP = "https://www.nopasanadape.com"
-
+# api and admin tokens
 INTERNAL_AUTH_TOKEN = "xsw5R0oHBUJWJhxUqTmHdGmuYhHUNVy62bdJMPtxFjXgjdpCg5K3NgIXQkqwxCujUQ5GtC7m8GWe8JawqlOEkYdmUQLcQTLy"
 EXTERNAL_AUTH_TOKEN = "6f1a9d4b27c3e8a0f5b19c2d43e7a8d1"
-
-# info email account
-ZOHO_INFO_PASSWORD = "5QJWEKi0trAL"
-
-# api email
-ZOHO_MAIL_API_CLIENT_ID = "1000.400ELE5I2WU72H931RQI8HTIY2Y30E"
-ZOHO_MAIL_API_CLIENT_SECRET = "fe41ea63cc1c667091b32b1068660cf0b44fffd823"
-ZOHO_MAIL_API_REDIRECT_URL = "https://www.nopasanadape.com/redir"
-
-# zeptomail
-ZOHO_INFO_PASSWORD = "5QJWEKi0trAL"
-ZEPTOMAIL_INFO_TOKEN = "Zoho-enczapikey wSsVR60lrkb4B/h8mmGtLutrmA5WDlzxQEwsiVGo7HKvSvrFosc/khXIBgGgT6UcGDFrQDMS9rIgyR4IgDAPjNotnAoGXiiF9mqRe1U4J3x17qnvhDzJXGxclROKKIwNwQRinmZkEs8m+g=="
 
 # BrightData  proxy
 PROXY_DC_USERNAME = (

@@ -15,7 +15,6 @@ import json
 from selenium.webdriver.common.by import By
 from src.utils.constants import (
     MONTHS_3_LETTERS,
-    NETWORK_PATH,
     TWOCAPTCHA_API_KEY,
     PUSHBULLET_API_TOKEN,
 )

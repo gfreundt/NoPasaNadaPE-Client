@@ -17,6 +17,7 @@ from src.utils.constants import (
     UPDATER_TOKEN,
     SERVER_IP,
     SERVER_IP_TEST,
+    SERVER_IP_DEV,
     TABLAS_BD,
 )
 from src.updates import gather_all
@@ -31,14 +32,24 @@ logging.getLogger("werkzeug").disabled = True
 
 
 class Dashboard:
-    def __init__(self, test):
+    def __init__(self, param):
         self.app = Flask(
             __name__,
             template_folder=os.path.join(NETWORK_PATH, "templates"),
             static_folder=os.path.join(NETWORK_PATH, "static"),
         )
         self.data_lock = threading.Lock()
-        self.url = f"{SERVER_IP_TEST if test else SERVER_IP}/update"
+        if param == "DEV":
+            _url = SERVER_IP_DEV
+            print("-------- DEVELOPMENT --------")
+        elif param == "TEST":
+            _url = SERVER_IP_TEST
+            print("++++++++ LOCAL TEST ++++++++")
+        else:
+            _url = SERVER_IP
+            print("*********** PRODUCTION ***********")
+
+        self.url = _url + "/update"
 
         # definir rutas de flask
         settings.set_routes(self)
@@ -265,7 +276,7 @@ class Dashboard:
             "instruction": "send_messages",
         }
         sent_messages = requests.post(url=self.url, json=_json)
-        self.log(action=f"*** Mensajes enviados: {sent_messages.content}")
+        self.log(action=f"*** Mensajes enviados: {sent_messages.json()}")
 
         return redirect("/")
 
