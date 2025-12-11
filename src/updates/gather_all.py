@@ -372,6 +372,9 @@ def update_local_gather_file(full_response):
         for i in os.listdir(os.path.join(NETWORK_PATH, "security"))
         if "update_" in i
     ]
+    if not update_files:
+        next_secuential = [0]
+
     next_secuential = max(update_files) + 1
     with open(
         os.path.join(NETWORK_PATH, "security", f"update_{next_secuential:05d}.json"),
