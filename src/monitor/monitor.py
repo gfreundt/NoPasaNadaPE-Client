@@ -3,7 +3,7 @@ import threading
 import logging
 from copy import deepcopy as copy
 import os
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as td
 import requests
 import subprocess
 import json
@@ -105,7 +105,11 @@ class Dashboard:
         """
         activa todos los procesos que corren en cronograma en un thread paralelo
         """
-        t = threading.Thread(target=cronograma.main, args=(self,), daemon=True)
+        self.siguiente_cron = dt.now() + td(minutes=1)
+        t = threading.Thread(target=auto_scraper.main, args=(self,), daemon=True)
+        self.log(
+            action=f"[ SERVICIO ] CRON: Autoscraper PRENDIDO. Intervalos cada {"5"} minutos."
+        )
         t.start()
 
     def log(self, **kwargs):
@@ -136,11 +140,6 @@ class Dashboard:
         return render_template("dashboard.html")
 
     # ------- ACCIONES DE APIS (INTERNO) -------
-    def auto_scraper(self):
-        self.auto_scraper_continue_flag = True
-        auto_scraper.main(self)
-        return redirect("/")
-
     def get_data(self):
         """
         endpoint for dashboard to update continually on dashboard information:

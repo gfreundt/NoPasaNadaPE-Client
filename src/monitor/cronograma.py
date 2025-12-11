@@ -1,5 +1,5 @@
 import time
-import schedule
+from datetime import datetime as dt, timedelta as td
 
 
 def main(self):
@@ -11,5 +11,6 @@ def main(self):
 
     # lanzar proceso
     while True:
-        schedule.run_pending()
+        if dt.now() > self.siguiente_cron:
+            self.auto_scraper()
         time.sleep(60)

@@ -24,9 +24,9 @@ def alta_prueba(url, correo):
     clientes = [
         {
             "celular": "",
-            "codigo_externo": "MAQ-007",
+            "codigo_externo": "MAQ-0137",
             "correo": correo,
-            "nombre": "Luis La Torre",
+            "nombre": "Test Email",
             "numero_documento": "",
             "tipo_documento": "",
         },
@@ -99,7 +99,7 @@ def kill_prueba(url, correo):
     )
 
 
-correo = "lucholtc@gmail.com"
+correo = "gabfre@gmail.com"
 # url = "https://nopasanadape.com"  # PROD
 # url = "http://localhost:5000"  # TEST
 url = "https://dev.nopasanadape.com"  # DEV

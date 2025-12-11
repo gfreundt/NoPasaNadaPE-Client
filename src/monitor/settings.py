@@ -9,13 +9,13 @@ def set_routes(self):
 
     # -------- APIS --------
 
-    # empieza el autoscraper
-    self.app.add_url_rule(
-        "/auto_scraper",
-        endpoint="auto_scraper",
-        view_func=self.auto_scraper,
-        methods=["POST"],
-    )
+    # # empieza el autoscraper
+    # self.app.add_url_rule(
+    #     "/auto_scraper",
+    #     endpoint="auto_scraper",
+    #     view_func=self.auto_scraper,
+    #     methods=["POST"],
+    # )
 
     # endpoint usado por JavaScript para actualizar datos (AJAX)
     self.app.add_url_rule(

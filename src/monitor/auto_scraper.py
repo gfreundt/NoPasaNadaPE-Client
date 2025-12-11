@@ -1,7 +1,7 @@
 from src.utils.constants import AUTOSCRAPER_REPETICIONES
 from src.utils.utils import send_pushbullet, check_vpn_online
 import time
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta as td
 
 
 def flujo(self, tipo_mensaje):
@@ -27,7 +27,10 @@ def flujo(self, tipo_mensaje):
             repetir += 1
             # excede cantidad de repeticiones, al menos un scraper no esta actualizando bien
             if repetir > AUTOSCRAPER_REPETICIONES:
-                return f"{tipo_mensaje.upper()}: No se llego a 0 pendientes luego de {AUTOSCRAPER_REPETICIONES} intentos."
+                return (
+                    f"{tipo_mensaje.upper()}: No se llego a 0 pendientes luego de {AUTOSCRAPER_REPETICIONES} intentos.",
+                    False,
+                )
 
             # reintentar scraping
             time.sleep(3)
@@ -35,10 +38,17 @@ def flujo(self, tipo_mensaje):
     # crear correos de alertas/boletines
     if tipo_mensaje == "alertas":
         self.generar_alertas()
+
     elif tipo_mensaje == "boletines":
         self.generar_boletines()
 
-    return f"{tipo_mensaje.upper()}: Scrapers completos. Se han generado {len(self.created_messages)} mensajes."
+    # enviar mensajes pendiente
+    self.enviar_mensajes()
+
+    return (
+        f"{tipo_mensaje.upper()}: Se han enviado {len(self.created_messages)} mensajes.",
+        True,
+    )
 
 
 def enviar_notificacion(mensaje):
@@ -48,30 +58,47 @@ def enviar_notificacion(mensaje):
     send_pushbullet(title=title, message=mensaje)
 
 
-def main(self):
-
+def iniciar_corrida(self):
+    self.auto_scraper_corriendo = True
     mensaje = [f"Inicio Autoscraper: {dt.now()}"]
 
     # si VPN no esta en linea, no iniciar
     if not check_vpn_online():
         self.log(action="[ AUTOSCRAPER ] Proceso Abortado. No hay VPN en linea.")
         mensaje.append("Proceso ABORTADO. No hay VPN en linea.")
+        exito1, exito2 = False
 
     else:
         self.log(action="[ AUTOSCRAPER ] Inicio")
 
         # procesar alertas
-        respuesta = flujo(self, tipo_mensaje="alertas")
+        respuesta, exito1 = flujo(self, tipo_mensaje="alertas")
         mensaje.append(respuesta)
         self.log(action="[ AUTOSCRAPER ] Fin Alertas")
 
         # procesar boletines
-        respuesta = flujo(self, tipo_mensaje="boletines")
+        respuesta, exito2 = flujo(self, tipo_mensaje="boletines")
         mensaje.append(respuesta)
         self.log(action="[ AUTOSCRAPER ] Fin Boletines")
 
-        # cerrar proceso
-        self.log(action="[ AUTOSCRAPER ] Fin")
-
-    # enviar resumen de actividad
+    # enviar resumen de actividad, definir nueva hora de correr y retornar si pudo avanzar o no
     enviar_notificacion(mensaje=mensaje)
+    self.siguiente_cron = dt.now() + td(minutes=5)
+    self.auto_scraper_corriendo = False
+    return exito1 and exito2
+
+
+def main(self):
+
+    self.auto_scraper_corriendo = False
+
+    while True:
+        print(
+            f"Autoscraper check: {str(dt.now())[:20]} - Siguiente: {str(self.siguiente_cron)[:20]} - Corriendo: {self.auto_scraper_corriendo}"
+        )
+        if dt.now() > self.siguiente_cron and not self.auto_scraper_corriendo:
+            exito = iniciar_corrida(self)
+            self.log(
+                action=f"[ SERVICIO ] CRON: Autoscraper {"SIN PROBLEMAS" if exito else "NO TERMINO"}. Siguiente: {str(self.siguiente_cron)[:20]}"
+            )
+        time.sleep(30)

@@ -239,7 +239,7 @@ def check_vpn_online():
     Si el Network Prefix del IP es diferente a del ISP, retorna True
     """
     current_ip = get_public_ip()
-    if current_ip and current_ip[:3] != "181":
+    if current_ip and current_ip[:3] != "190":
         return True
 
 
