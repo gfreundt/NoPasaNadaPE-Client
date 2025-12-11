@@ -77,6 +77,14 @@ def browser(doc_num, webdriver):
             webdriver.refresh()
         return []
 
+    # alternativa sin datos: abre ventana pero no tiene pestañas, retornar en blanco
+    x = webdriver.find_elements(
+        By.XPATH,
+        "/html/body/app-root/div[2]/app-search/div[2]/mat-tab-group/div/mat-tab-body[1]/div/div/div/mat-card/mat-card-content/div",
+    )
+    if x and "No cuenta con" in x[0].text:
+        return []
+
     # scrape data
     _id_tipo = 11 if webdriver.find_elements(By.ID, "mat-input-11") else 17
     response = []

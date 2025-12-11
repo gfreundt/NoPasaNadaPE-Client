@@ -35,21 +35,14 @@ def browser(placa, webdriver):
     time.sleep(0.5)
 
     intentos_captcha = 0
-    while intentos_captcha < 5:
+    while intentos_captcha < 3:
 
         # capture captcha image from webpage and save
-        _captcha_file_like = io.BytesIO(
-            webdriver.find_element(By.ID, "image").screenshot_as_png
-        )
-        captcha_txt = use_truecaptcha(_captcha_file_like)["result"]
-        if not captcha_txt:
-            return "Servicio Captcha Offline."
-
-        # clear captcha field and enter captcha text
-        webdriver.find_element(By.ID, "codigoCaptcha").send_keys(
-            Keys.BACKSPACE * 6 + captcha_txt
-        )
-        time.sleep(0.5)
+        time.sleep(3)
+        x = webdriver.find_elements(By.XPATH, "/html/body//div/div/div[1]/div/label/input")
+        if x:
+            webdriver.execute_script("arguments[0].click();", x[0])
+            time.sleep(2)
 
         # click on "Realizar Busqueda"
         btn = webdriver.find_element(

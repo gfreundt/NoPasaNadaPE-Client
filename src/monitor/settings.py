@@ -89,7 +89,7 @@ def set_routes(self):
     self.app.add_url_rule(
         "/db_backup",
         endpoint="db_backup",
-        view_func=self.db_backup,
+        view_func=self.db_completa,
         methods=["POST"],
     )
     self.app.add_url_rule(

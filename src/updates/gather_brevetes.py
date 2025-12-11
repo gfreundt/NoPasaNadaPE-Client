@@ -86,6 +86,8 @@ def gather(
                             "IdMember_FK": id_member,
                         }
                     )
+                # texto en dashboard
+                dash.log(action=f"[ BREVETES ] {doc_num}")
                 continue
 
             # ajustar formato de fechas al de la base de datos (YYYY-MM-DD)

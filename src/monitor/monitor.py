@@ -308,36 +308,18 @@ class Dashboard:
             self.log(action="Logs Actualizados")
         return redirect("/")
 
-    def db_backup(self):
-        cmd = [
-            "scp",
-            "-i",
-            f"{NETWORK_PATH}/security/virtual_machine_access",
-            "-o",
-            "IdentitiesOnly=yes",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            "-o",
-            "StrictHostKeyChecking=no",
-            "nopasanadape@35.208.218.61:/home/nopasanadape/NoPasaNadaPE-Server/data/members.db",
-            f"{NETWORK_PATH}/security/",
-        ]
-        # copy file from remote server
-        result = subprocess.run(cmd, capture_output=True, text=True)
-
-        # rename file to append current timestamp
-        _now = dt.now().strftime("%Y-%m-%d_%H.%M.%S")
-
-        os.rename(
-            os.path.join(NETWORK_PATH, "security", "members.db"),
-            os.path.join(NETWORK_PATH, "security", f"members_backup_{_now}.db"),
-        )
-
-        if result.returncode == 0:
-            self.log(action="*** DB Backup Local Correcto")
-        else:
-            self.log(action="Error de Backup:" + result.stderr)
-
+    def db_completa(self):
+        _json = {"token": UPDATER_TOKEN, "instruction": "get_entire_db"}
+        response = requests.post(url=self.url, json=_json).json()
+        response.update({"Timestamp": str(dt.now())})
+        with open(
+            os.path.join(
+                NETWORK_PATH, "security", f"membersdb - {str(dt.now())[:10]}.json"
+            ),
+            mode="w",
+        ) as outfile:
+            json.dump(response, outfile)
+        self.log(action=f"Copia Completa de BD: membersdb - {str(dt.now())[:10]}.json")
         return redirect("/")
 
     def actualizar_de_json(self):

@@ -24,9 +24,9 @@ def alta_prueba(url, correo):
     clientes = [
         {
             "celular": "",
-            "codigo_externo": "",
+            "codigo_externo": "MAQ-007",
             "correo": correo,
-            "nombre": "",
+            "nombre": "Luis La Torre",
             "numero_documento": "",
             "tipo_documento": "",
         },
@@ -36,7 +36,7 @@ def alta_prueba(url, correo):
         url=url + "/api/v1",
         json={
             "token": EXTERNAL_AUTH_TOKEN,
-            "usuario": "SEX-000",
+            "usuario": "USU-007",
             "solicitud": "alta",
             "clientes": clientes,
         },
@@ -99,7 +99,7 @@ def kill_prueba(url, correo):
     )
 
 
-correo = "edorta.ibarra.rooth@gmail.com"
+correo = "lucholtc@gmail.com"
 # url = "https://nopasanadape.com"  # PROD
 # url = "http://localhost:5000"  # TEST
 url = "https://dev.nopasanadape.com"  # DEV

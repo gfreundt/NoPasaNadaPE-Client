@@ -34,6 +34,17 @@ def gather(
             record_item = queue_update_data.get_nowait()
             placa = record_item
 
+            # mientras dure captcha...
+            with lock:
+                local_response.append(
+                    {
+                        "Empty": True,
+                        "PlacaValidate": placa,
+                    }
+                )
+                dash.log(action=f"[ SUNARPS ] {placa}")
+                continue
+
         except Empty:
             # log de salida del scraper
             dash.log(
