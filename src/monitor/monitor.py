@@ -23,7 +23,7 @@ from src.utils.constants import (
 from src.updates import gather_all
 from src.test import tests
 from src.monitor import update_kpis
-import schedule
+from src.utils.utils import start_vpn, stop_vpn
 
 from pprint import pprint
 
@@ -59,6 +59,9 @@ class Dashboard:
 
         # iniciar en thread paralelo
         self.iniciar_actualizador_kpis()
+
+        # definir primera localizacion de VPN en PE
+        self.vpn_location = "PE"
 
         # iniciar cronogramas
         self.iniciar_cron()

@@ -52,6 +52,27 @@ GC_BUDGET_ID = "projects/123456789012/budgets/MyMonthlyBudget"  # FAKE!
 # pushbullet
 PUSHBULLET_API_TOKEN = "o.BMp5HNWSPNMS8Gbqsufntv94feuklPMg"
 
+OVPN_CONFIG = {
+    "PE": {
+        "path": os.path.join(
+            NETWORK_PATH,
+            "security",
+            "pe-lim.prod.surfshark.comsurfshark_openvpn_udp.ovpn",
+        ),
+        "management_port": 45788,
+        "task_name": r"\GFT\OpenVPN Location = PE",
+    },
+    "AR": {
+        "path": os.path.join(
+            NETWORK_PATH,
+            "security",
+            "ar-bua.prod.surfshark.comsurfshark_openvpn_udp.ovpn",
+        ),
+        "management_port": 45789,
+        "task_name": r"\GFT\OpenVPN Location = AR",
+    },
+}
+
 # 3-letter months
 MONTHS_3_LETTERS = (
     "Ene",

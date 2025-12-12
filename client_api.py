@@ -24,9 +24,9 @@ def alta_prueba(url, correo):
     clientes = [
         {
             "celular": "",
-            "codigo_externo": "MAQ-0137",
+            "codigo_externo": "MAQ-2137",
             "correo": correo,
-            "nombre": "Test Email",
+            "nombre": "Testfff Email",
             "numero_documento": "",
             "tipo_documento": "",
         },
@@ -99,7 +99,7 @@ def kill_prueba(url, correo):
     )
 
 
-correo = "gabfre@gmail.com"
+correo = "urpi@datum.com.pe"
 # url = "https://nopasanadape.com"  # PROD
 # url = "http://localhost:5000"  # TEST
 url = "https://dev.nopasanadape.com"  # DEV
@@ -107,7 +107,7 @@ url = "https://dev.nopasanadape.com"  # DEV
 
 # f = mensajes_enviados_prueba(url)
 # f = nuevo_pwd(url,correo)
-# f = kill_prueba(url, correo)
+f = kill_prueba(url, correo)
 f = alta_prueba(url, correo)
 # f = baja_prueba(url,correo)
 

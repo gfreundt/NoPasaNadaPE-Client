@@ -6,8 +6,8 @@ import requests
 from requests.exceptions import Timeout, ConnectionError, RequestException
 import base64
 import socket
-import random
 import json
+import subprocess
 
 
 # import pyautogui
@@ -17,6 +17,8 @@ from src.utils.constants import (
     MONTHS_3_LETTERS,
     TWOCAPTCHA_API_KEY,
     PUSHBULLET_API_TOKEN,
+    NETWORK_PATH,
+    OVPN_CONFIG,
 )
 
 
@@ -243,51 +245,43 @@ def check_vpn_online():
         return True
 
 
-# def change_vpn_manually():
-#     COUNTRIES = [
-#         "Alemania",
-#         "Argentina",
-#         "Argelia",
-#         "Brasil",
-#         "Ecuador",
-#         "Espa",
-#         "Egipto",
-#         "Atlanta",
-#         "Miami",
-#         "Phoenix",
-#         "Letonia",
-#         "Venezuela",
-#         "Uruguay",
-#         "Nueva Ze",
-#     ]
+def start_vpn(location_code):
+    """
+    Triggers the pre-configured, elevated task in the Windows Task Scheduler.
+    """
+    task_name = OVPN_CONFIG[location_code]["task_name"]
+    command = ["schtasks", "/run", "/tn", task_name]
 
-#     new_vpn = random.choice(COUNTRIES)
+    try:
+        # Use subprocess.run() for this short, blocking command
+        subprocess.run(
+            command,
+            check=True,  # Raise an exception if the command fails
+            capture_output=True,
+            text=True,
+        )
+        time.sleep(10)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False
 
-#     while True:
-#         try:
-#             x = pyautogui.locateCenterOnScreen(
-#                 os.path.join(NETWORK_PATH, "static", "arrowVPN.png"),
-#                 region=(2500, 1200, 4000, 1800),
-#                 confidence=0.7,
-#             )
-#             pyautogui.click(x)
-#             time.sleep(1)
-#             for i in new_vpn:
-#                 pyautogui.press(i)
-#                 time.sleep(0.2)
-#             pyautogui.moveRel((-380, -390))
-#             pyautogui.click()
-#             time.sleep(3)
-#             return True
 
-#         except (ValueError, ImageNotFoundException):
-#             try:
-#                 x = pyautogui.locateCenterOnScreen(
-#                     os.path.join(NETWORK_PATH, "static", "iconVPN.png"),
-#                     region=(2000, 2050, 2800, 2180),
-#                     confidence=0.9,
-#                 )
-#                 time.sleep(1)
-#                 pyautogui.click(x)
-#             except (ValueError, ImageNotFoundException):
-#                 return False
+def stop_vpn():
+    """
+    Checks defined ports, identifies the active VPN, and shuts it down.
+    """
+    task_name = r"\GFT\Kill openvpn.exe"
+    command = ["schtasks", "/run", "/tn", task_name]
+
+    try:
+        # Use subprocess.run() for this short, blocking command
+        subprocess.run(
+            command,
+            check=True,  # Raise an exception if the command fails
+            capture_output=True,
+            text=True,
+        )
+        time.sleep(10)
+        return True
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return False

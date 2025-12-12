@@ -1,6 +1,7 @@
 from datetime import datetime as dt, timedelta as td
 from queue import Empty
 import time
+from func_timeout import exceptions
 
 # local imports
 from src.scrapers import scrape_recvehic
@@ -113,6 +114,18 @@ def gather(
 
         except KeyboardInterrupt:
             quit()
+
+        except exceptions.FunctionTimedOut:
+            # devolver registro a la cola para que otro thread lo complete
+            if record_item is not None:
+                queue_update_data.put(record_item)
+
+            dash.log(
+                card=card,
+                status=2,
+                lastUpdate="ERROR: Timeout",
+            )
+            break
 
         except Exception as e:
             # devolver registro a la cola para que otro thread lo complete

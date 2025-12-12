@@ -1,5 +1,5 @@
 from src.utils.constants import AUTOSCRAPER_REPETICIONES
-from src.utils.utils import send_pushbullet, check_vpn_online
+from src.utils.utils import send_pushbullet, check_vpn_online, start_vpn, stop_vpn
 import time
 from datetime import datetime as dt, timedelta as td
 
@@ -21,34 +21,29 @@ def flujo(self, tipo_mensaje):
 
         # si ya no hay actualizaciones pendientes, siguiente paso
         if all([len(j) == 0 for j in pendientes.values()]):
-            break
+            return True
         else:
             self.actualizar()
+
+            # cambiar de pais en VPN
+            stop_vpn()
+            self.log(action="[ VPN OFF ]")
+
+            if self.vpn_location == "PE":
+                self.vpn_location = "AR"
+            else:
+                self.vpn_location = "PE"
+
+            start_vpn(self.vpn_location)
+            self.log(action=f"[ VPN PRENDIDA ({self.vpn_location})]")
+
+            # aumentar contador de repeticiones, si excede limite parar
             repetir += 1
-            # excede cantidad de repeticiones, al menos un scraper no esta actualizando bien
             if repetir > AUTOSCRAPER_REPETICIONES:
-                return (
-                    f"{tipo_mensaje.upper()}: No se llego a 0 pendientes luego de {AUTOSCRAPER_REPETICIONES} intentos.",
-                    False,
-                )
+                return False
 
             # reintentar scraping
             time.sleep(3)
-
-    # crear correos de alertas/boletines
-    if tipo_mensaje == "alertas":
-        self.generar_alertas()
-
-    elif tipo_mensaje == "boletines":
-        self.generar_boletines()
-
-    # enviar mensajes pendiente
-    self.enviar_mensajes()
-
-    return (
-        f"{tipo_mensaje.upper()}: Se han enviado {len(self.created_messages)} mensajes.",
-        True,
-    )
 
 
 def enviar_notificacion(mensaje):
@@ -59,33 +54,48 @@ def enviar_notificacion(mensaje):
 
 
 def iniciar_corrida(self):
+
     self.auto_scraper_corriendo = True
-    mensaje = [f"Inicio Autoscraper: {dt.now()}"]
+    self.log(action="[ AUTOSCRAPER ] Inicio")
+    # prender VPN
+    start_vpn(self.vpn_location)
+    self.log(action=f"[ VPN PRENDIDA ({self.vpn_location})]")
 
     # si VPN no esta en linea, no iniciar
     if not check_vpn_online():
         self.log(action="[ AUTOSCRAPER ] Proceso Abortado. No hay VPN en linea.")
-        mensaje.append("Proceso ABORTADO. No hay VPN en linea.")
-        exito1, exito2 = False
+        exito1 = exito2 = False
 
     else:
-        self.log(action="[ AUTOSCRAPER ] Inicio")
 
         # procesar alertas
-        respuesta, exito1 = flujo(self, tipo_mensaje="alertas")
-        mensaje.append(respuesta)
+        exito1 = flujo(self, tipo_mensaje="alertas")
         self.log(action="[ AUTOSCRAPER ] Fin Alertas")
 
         # procesar boletines
-        respuesta, exito2 = flujo(self, tipo_mensaje="boletines")
-        mensaje.append(respuesta)
+        exito2 = flujo(self, tipo_mensaje="boletines")
         self.log(action="[ AUTOSCRAPER ] Fin Boletines")
 
-    # enviar resumen de actividad, definir nueva hora de correr y retornar si pudo avanzar o no
-    enviar_notificacion(mensaje=mensaje)
+    # apagar VPN
+    stop_vpn()
+    self.log(action="[ VPN OFF ]")
+
+    # enviar resumen de actividad
+    enviar_notificacion(mensaje="Mensajes enviados")
+
+    # definir nueva hora de correr
     self.siguiente_cron = dt.now() + td(minutes=5)
     self.auto_scraper_corriendo = False
-    return exito1 and exito2
+
+    if exito1 and exito2:
+        # generar y enviar mensajes
+        self.generar_alertas()
+        self.generar_boletines()
+        self.enviar_mensajes()
+        # retornar proceso completo
+        return True
+    # retornar proceso no puedo terminar
+    return False
 
 
 def main(self):
