@@ -22,12 +22,14 @@ def flujo(self, tipo_mensaje):
 
         # si ya no hay actualizaciones pendientes, siguiente paso
         if all([len(j) == 0 for j in pendientes.values()]):
+            print("Limpio")
             stop_vpn()
             return True
 
         else:
 
             if _first:
+                print("VPN")
                 start_vpn(self.vpn_location)
                 self.actualizar()
                 _first = False
@@ -46,6 +48,7 @@ def flujo(self, tipo_mensaje):
 
                 start_vpn(self.vpn_location)
                 self.log(action=f"[ VPN PRENDIDA ({self.vpn_location})]")
+                self.actualizar()
 
                 # aumentar contador de repeticiones, si excede limite parar
                 repetir += 1

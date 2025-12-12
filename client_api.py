@@ -2,6 +2,8 @@ import requests
 from pprint import pprint
 from src.utils.constants import EXTERNAL_AUTH_TOKEN, INTERNAL_AUTH_TOKEN
 import json
+import sys
+import random
 
 
 """Simulacion de API de Maquinarias"""
@@ -24,9 +26,9 @@ def alta_prueba(url, correo):
     clientes = [
         {
             "celular": "",
-            "codigo_externo": "MAQ-2137",
+            "codigo_externo": f"MAQ-{str(random.randrange(9999))}",
             "correo": correo,
-            "nombre": "Testfff Email",
+            "nombre": "Es una prueba",
             "numero_documento": "",
             "tipo_documento": "",
         },
@@ -99,18 +101,23 @@ def kill_prueba(url, correo):
     )
 
 
-correo = "urpi@datum.com.pe"
-# url = "https://nopasanadape.com"  # PROD
-# url = "http://localhost:5000"  # TEST
 url = "https://dev.nopasanadape.com"  # DEV
+args = sys.argv
 
+if len(args) < 3:
+    print("Incompleto")
+    quit()
 
-# f = mensajes_enviados_prueba(url)
-# f = nuevo_pwd(url,correo)
-f = kill_prueba(url, correo)
-f = alta_prueba(url, correo)
-# f = baja_prueba(url,correo)
+correo = args[2]
 
-pprint(f.status_code)
-x = json.loads(f.content.decode())
-pprint(x)
+if args[1] == "ALTA":
+    f = alta_prueba(url, correo)
+    pprint(json.loads(f.content.decode()))
+
+if args[1] == "KILL":
+    f = kill_prueba(url, correo)
+    pprint(json.loads(f.content.decode()))
+
+if args[1] == "MSG":
+    f = mensajes_enviados_prueba(url)
+    pprint(json.loads(f.content.decode()))
