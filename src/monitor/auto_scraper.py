@@ -8,6 +8,7 @@ def flujo(self, tipo_mensaje):
 
     # intentar una cantidad de veces actualizar el 100% de pendientes
     repetir = 0
+    _first = True
     while True:
 
         # solicitar alertas/boletines pendientes para enviar a actualizar
@@ -21,29 +22,38 @@ def flujo(self, tipo_mensaje):
 
         # si ya no hay actualizaciones pendientes, siguiente paso
         if all([len(j) == 0 for j in pendientes.values()]):
-            return True
-        else:
-            self.actualizar()
-
-            # cambiar de pais en VPN
             stop_vpn()
-            self.log(action="[ VPN OFF ]")
+            return True
 
-            if self.vpn_location == "PE":
-                self.vpn_location = "AR"
+        else:
+
+            if _first:
+                start_vpn(self.vpn_location)
+                self.actualizar()
+                _first = False
+                continue
+
             else:
-                self.vpn_location = "PE"
 
-            start_vpn(self.vpn_location)
-            self.log(action=f"[ VPN PRENDIDA ({self.vpn_location})]")
+                # cambiar de pais en VPN
+                stop_vpn()
+                self.log(action="[ VPN OFF ]")
 
-            # aumentar contador de repeticiones, si excede limite parar
-            repetir += 1
-            if repetir > AUTOSCRAPER_REPETICIONES:
-                return False
+                if self.vpn_location == "PE":
+                    self.vpn_location = "AR"
+                else:
+                    self.vpn_location = "PE"
 
-            # reintentar scraping
-            time.sleep(3)
+                start_vpn(self.vpn_location)
+                self.log(action=f"[ VPN PRENDIDA ({self.vpn_location})]")
+
+                # aumentar contador de repeticiones, si excede limite parar
+                repetir += 1
+                if repetir > AUTOSCRAPER_REPETICIONES:
+                    return False
+
+                # reintentar scraping
+                time.sleep(3)
 
 
 def enviar_notificacion(mensaje):
@@ -57,28 +67,14 @@ def iniciar_corrida(self):
 
     self.auto_scraper_corriendo = True
     self.log(action="[ AUTOSCRAPER ] Inicio")
-    # prender VPN
-    start_vpn(self.vpn_location)
-    self.log(action=f"[ VPN PRENDIDA ({self.vpn_location})]")
 
-    # si VPN no esta en linea, no iniciar
-    if not check_vpn_online():
-        self.log(action="[ AUTOSCRAPER ] Proceso Abortado. No hay VPN en linea.")
-        exito1 = exito2 = False
+    # procesar alertas
+    exito1 = flujo(self, tipo_mensaje="alertas")
+    self.log(action="[ AUTOSCRAPER ] Fin Alertas")
 
-    else:
-
-        # procesar alertas
-        exito1 = flujo(self, tipo_mensaje="alertas")
-        self.log(action="[ AUTOSCRAPER ] Fin Alertas")
-
-        # procesar boletines
-        exito2 = flujo(self, tipo_mensaje="boletines")
-        self.log(action="[ AUTOSCRAPER ] Fin Boletines")
-
-    # apagar VPN
-    stop_vpn()
-    self.log(action="[ VPN OFF ]")
+    # procesar boletines
+    exito2 = flujo(self, tipo_mensaje="boletines")
+    self.log(action="[ AUTOSCRAPER ] Fin Boletines")
 
     # enviar resumen de actividad
     enviar_notificacion(mensaje="Mensajes enviados")
@@ -94,6 +90,7 @@ def iniciar_corrida(self):
         self.enviar_mensajes()
         # retornar proceso completo
         return True
+
     # retornar proceso no puedo terminar
     return False
 

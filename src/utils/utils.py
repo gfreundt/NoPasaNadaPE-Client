@@ -236,13 +236,10 @@ def get_public_ip():
 
 
 def check_vpn_online():
-    """
-    Revisa si el VPN esta en linea.
-    Si el Network Prefix del IP es diferente a del ISP, retorna True
-    """
-    current_ip = get_public_ip()
-    if current_ip and current_ip[:3] != "190":
-        return True
+    output = subprocess.check_output(
+        ["tasklist", "/FI", "IMAGENAME eq openvpn.exe"], text=True
+    )
+    return "No tasks" not in output
 
 
 def start_vpn(location_code):
@@ -267,9 +264,11 @@ def start_vpn(location_code):
 
 
 def stop_vpn():
-    """
-    Checks defined ports, identifies the active VPN, and shuts it down.
-    """
+
+    # si VPN esta apagada, no ejecutar
+    if not check_vpn_online():
+        return
+
     task_name = r"\GFT\Kill openvpn.exe"
     command = ["schtasks", "/run", "/tn", task_name]
 
