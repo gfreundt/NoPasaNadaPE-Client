@@ -1,13 +1,10 @@
 import requests
-import json
 import time
 
 # from google.cloud import billingbudgets_v1
 from src.utils.constants import (
     TRUECAPTCHA_API_KEY,
     BRIGHT_DATA_API_KEY,
-    GC_BILLING_ACCOUNT_ID,
-    GC_BUDGET_ID,
     TWOCAPTCHA_API_KEY,
 )
 
@@ -128,17 +125,13 @@ def main(self):
     """actualiza la variable de Dashboard con el resultado de las consultas
     de saldos/status de los servicios usados cada cierto tiempo"""
 
-    while True:
-
-        kpis = {
-            "kpi_nopasanadape_status": get_nopasanadape(),
-            "kpi_truecaptcha_balance": get_truecaptcha(),
-            "kpi_zeptomail_balance": get_zeptomail(),
-            "kpi_brightdata_balance": get_brightdata(),
-            "kpi_twocaptcha_balance": get_2captcha(),
-            "kpi_googlecloud_balance": get_googlecloud(),
-            "kpi_cloudfare_status": get_cloudfare(),
-        }
-        self.data.update(kpis)
-
-        time.sleep(120)
+    kpis = {
+        "kpi_nopasanadape_status": get_nopasanadape(),
+        "kpi_truecaptcha_balance": get_truecaptcha(),
+        "kpi_zeptomail_balance": get_zeptomail(),
+        "kpi_brightdata_balance": get_brightdata(),
+        "kpi_twocaptcha_balance": get_2captcha(),
+        "kpi_googlecloud_balance": get_googlecloud(),
+        "kpi_cloudfare_status": get_cloudfare(),
+    }
+    self.data.update(kpis)

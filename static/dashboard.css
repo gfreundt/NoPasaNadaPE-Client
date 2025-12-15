@@ -60,3 +60,32 @@
     .outer-table td {
       text-align: center;
     }
+
+/* Scraper table — balanced compact rows (true midpoint) */
+table.scraper-table-text td,
+table.scraper-table-text th {
+  padding-top: 0.08rem !important;
+  padding-bottom: 0.08rem !important;
+  padding-left: 0.28rem !important;
+  padding-right: 0.28rem !important;
+  line-height: 1.1 !important;       /* midpoint between crushed and loose */
+  vertical-align: middle !important;
+}
+
+/* Keep switches perfectly centered */
+table.scraper-table-text td .form-check.form-switch {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Remove Bootstrap offsets */
+table.scraper-table-text td .form-check {
+  padding-left: 0 !important;
+}
+
+table.scraper-table-text td .form-check-input {
+  margin: 0 !important;
+}

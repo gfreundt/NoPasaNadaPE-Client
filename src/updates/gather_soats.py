@@ -153,7 +153,8 @@ def gather(
             )
             break
 
-    # cerrar el driver antes de volver
+    # sacar worker de lista de activos cerrar driver
+    dash.assigned_cards.remove(card)
     webdriver.quit()
 
 

@@ -103,6 +103,7 @@ HEADLESS = {
     "sunarp": True,
     "sunat": True,
     "sutran": True,
+    "calmul": True,
 }
 
 # nombre de tablas
@@ -115,6 +116,7 @@ TABLAS_BD = {
     "DataSutranMultas",
     "DataSunarpFichas",
     "DataApesegSoats",
+    "DataCallaoMultas",
 }
 
 
@@ -131,6 +133,7 @@ SCRAPER_TIMEOUT = {
     "sunarps": 60,
     "sunat": True,
     "sutrans": 60,
+    "calmul": 90,
 }
 
 DASHBOARD_URL = "wvpeagu2d27l6v7b"
@@ -181,5 +184,5 @@ MTC_CAPTCHAS = {
     "zapato": 32,
 }
 
-GATHER_ITERATIONS = 3
+GATHER_ITERATIONS = 5
 AUTOSCRAPER_REPETICIONES = 3

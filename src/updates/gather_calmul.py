@@ -1,11 +1,11 @@
-from datetime import datetime as dt, timedelta as td
+from datetime import datetime as dt
 import time
 from queue import Empty
 from func_timeout import exceptions
 
 # local imports
 from src.utils.utils import date_to_db_format
-from src.scrapers import scrape_brevete
+from src.scrapers import scrape_calmul
 from src.utils.webdriver import ChromeUtils
 from src.utils.constants import HEADLESS
 
@@ -15,7 +15,7 @@ def gather(
 ):
 
     # construir webdriver con parametros especificos
-    chromedriver = ChromeUtils(headless=HEADLESS["brevetes"])
+    chromedriver = ChromeUtils(headless=HEADLESS["calmul"])
     webdriver = chromedriver.direct_driver()
 
     # iniciar variables para calculo de ETA
@@ -27,12 +27,12 @@ def gather(
         # intentar extraer siguiente registro de cola compartida
         try:
             record_item = queue_update_data.get_nowait()
-            id_member, doc_tipo, doc_num = record_item
+            placa = record_item
         except Empty:
             dash.log(
                 card=card,
                 status=3,
-                title=f"Brevetes-{subthread} [PROCESADOS: {procesados}]",
+                title=f"Multas Callao-{subthread} [PROCESADOS: {procesados}]",
                 text="Inactivo",
                 lastUpdate=f"Fin: {dt.strftime(dt.now(),"%H:%M:%S")}",
             )
@@ -43,14 +43,14 @@ def gather(
             # actualizar dashboard con registro en proceso
             dash.log(
                 card=card,
-                title=f"Brevetes-{subthread} [Pendientes: {total_original-procesados}]",
-                text=f"Procesando: {doc_tipo} {doc_num}",
+                title=f"Multas Callao-{subthread} [Pendientes: {total_original-procesados}]",
+                text=f"Procesando: {placa}",
                 status=1,
             )
 
             # enviar registro a scraper
-            scraper_response = scrape_brevete.browser_wrapper(
-                doc_num=doc_num, webdriver=webdriver
+            scraper_response = scrape_calmul.browser_wrapper(
+                placa=placa, webdriver=webdriver
             )
 
             # si respuesta es texto, hubo un error -- regresar
@@ -83,11 +83,11 @@ def gather(
                     local_response.append(
                         {
                             "Empty": True,
-                            "IdMember_FK": id_member,
+                            "PlacaValidate": placa,
                         }
                     )
                 # texto en dashboard
-                dash.log(action=f"[ BREVETES ] {doc_num}")
+                dash.log(action=f"[ CALMUL ] {placa}")
                 continue
 
             # ajustar formato de fechas al de la base de datos (YYYY-MM-DD)
@@ -96,16 +96,13 @@ def gather(
             # agregar registo a acumulador de respuestas (compartido con otros scrapers)
             local_response.append(
                 {
-                    "IdMember_FK": id_member,
-                    "Clase": _n[0],
-                    "Numero": _n[1],
-                    "Tipo": _n[2],
-                    "FechaExp": _n[3],
-                    "Restricciones": _n[4],
-                    "FechaHasta": _n[5],
-                    "Centro": _n[6],
-                    "Puntos": _n[7],
-                    "Record": _n[8],
+                    "PlacaValidate": placa,
+                    "Codigo": _n[0],
+                    "NumeroPapeleta": _n[1],
+                    "FechaInfraccion": _n[2],
+                    "TotalInfraccion": _n[3],
+                    "TotalBeneficio": _n[4],
+                    "ImageBytes": _n[5],
                     "LastUpdate": dt.now().strftime("%Y-%m-%d"),
                 }
             )
@@ -114,7 +111,7 @@ def gather(
             procesados += 1
 
             # texto en dashboard
-            dash.log(action=f"[ BREVETES ] {doc_num}")
+            dash.log(action=f"[ BREVETES ] {placa}")
 
         except KeyboardInterrupt:
             quit()

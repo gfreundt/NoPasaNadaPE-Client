@@ -98,3 +98,21 @@ def set_routes(self):
         view_func=self.actualizar_de_json,
         methods=["POST"],
     )
+    self.app.add_url_rule(
+        "/clear_logs",
+        "clear_logs",
+        self.clear_logs,
+        methods=["POST"],
+    )
+    self.app.add_url_rule(
+        "/db_vacuum",
+        "db_vacuum",
+        self.db_vacuum,
+        methods=["POST"],
+    )
+    self.app.add_url_rule(
+        "/toggle_scraper_status",
+        "toggle_scraper_status",
+        self.toggle_scraper_status,
+        methods=["POST"],
+    )

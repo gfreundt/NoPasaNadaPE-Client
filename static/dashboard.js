@@ -40,8 +40,9 @@ function updateScrapeData(data) {
                     "DataSutranMultas",
                     "DataSunarpFichas",
                     "DataApesegSoats",
-                    "DataSatImpuestosCodigos"];
-    const columns = ['status', 'pendientes', 'eta', 'threads_activos'];
+                    "DataSatImpuestosCodigos",
+                    "DataCallaoMultas"];
+    const columns = ['status', 'pendientes', 'eta', 'threads_activos','alertas','boletines'];
 
     if (data.scrapers_kpis) {
         categories.forEach(category => {

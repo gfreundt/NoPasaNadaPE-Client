@@ -1,31 +1,48 @@
-from datetime import datetime as dt, timedelta as td
-from queue import Empty
 import time
+from datetime import datetime as dt, timedelta as td
+import os
+import json
+import atexit
+import queue
+from threading import Thread, Lock
 from func_timeout import exceptions
 from copy import deepcopy as copy
-
-# local imports (Placeholder for your specific imports)
-# You would need to ensure these imports are available in the environment
-from src.scrapers import (
-    scrape_recvehic,
-    scrape_sunarp,
-    scrape_sutran,
-    scrape_soat,
-    scrape_satmul,
-    scrape_satimp,
-    scrape_revtec,
-    scrape_brevete,
-)
-from src.utils.webdriver import ChromeUtils
-from src.utils.constants import HEADLESS, ASEGURADORAS, NETWORK_PATH
-from src.utils.utils import date_to_db_format
-from PIL import Image, ImageDraw, ImageFont
-import os
 import io
 import base64
 
+from src.scrapers.scraper_configurations import SCRAPER_CONFIGS
+from src.utils.constants import HEADLESS, GATHER_ITERATIONS, NETWORK_PATH, ASEGURADORAS
+from src.utils.webdriver import ChromeUtils
+from src.utils.utils import date_to_db_format
 
-def generic_gather(
+
+# --- Helper Functions (From individual files) ---
+
+
+def update_local_gather_file(full_response):
+    """Saves the current response data to a JSON file (From gather_all.py)."""
+    # NOTE: This uses NETWORK_PATH from constants, assumed available.
+    if not full_response:
+        return
+    update_files = [
+        int(i[-10:-5])
+        for i in os.listdir(os.path.join(NETWORK_PATH, "security"))
+        if "update_" in i
+    ]
+    next_secuential = max(update_files) + 1 if update_files else 1
+    os.makedirs(os.path.join(NETWORK_PATH, "security"), exist_ok=True)
+    with open(
+        os.path.join(NETWORK_PATH, "security", f"update_{next_secuential:05d}.json"),
+        mode="w",
+    ) as outfile:
+        outfile.write(json.dumps(full_response, indent=4))
+
+
+# --- Core Gathering Logic (Consolidated from all gather_*.py files) ---
+
+
+def gather_subthread(
+    config_key,
     dash,
     queue_update_data,
     local_response,
@@ -33,36 +50,31 @@ def generic_gather(
     lock,
     card,
     subthread,
-    config,
 ):
-    """
-    Centralized function to gather data for various scraping services.
+    """The core logic for a single scraping subthread."""
+    config = SCRAPER_CONFIGS[config_key]
+    headless_key = config["headless_key"]
+    scraper_module = config["scraper"]
+    is_member_data = config.get("is_member_data", False)
+    response_handler = config["response_handler"]
+    skip_if_captcha = config.get("skip_response_if_captcha", False)
 
-    Args:
-        dash: Dashboard object for logging updates.
-        queue_update_data: Shared Queue for records to process.
-        local_response: List to accumulate scraped results.
-        total_original: Total number of records initially.
-        lock: Threading Lock for shared resource access.
-        card: Dashboard card ID.
-        subthread: Subthread index.
-        config: Dictionary containing service-specific configuration.
-    """
+    # Build webdriver (customized for Sunarp/SOAT/SATMUL if needed, defaulting to generic)
+    incognito = False
+    window_size = None
+    if config_key in ["sunarps", "satmuls", "soats"]:
+        incognito = True
+        window_size = (1920, 1080)
 
-    # Configuration extraction
-    service_name = config["service_name"]
-    driver_config = config["driver_config"]
-    scraper_func = config["scraper_func"]
-    get_queue_item = config["get_queue_item"]
-    prepare_scraper_args = config["prepare_scraper_args"]
-    process_response = config["process_response"]
-
-    # 1. Build WebDriver
-    chromedriver = ChromeUtils(**driver_config)
+    chromedriver = ChromeUtils(
+        headless=HEADLESS[headless_key],
+        incognito=incognito,
+        window_size=window_size,
+    )
     webdriver = chromedriver.direct_driver()
-    same_ip_scrapes = 0  # Only used/managed for SOAT, but harmless for others
+    same_ip_scrapes = 0  # Only relevant for SOAT, but harmless elsewhere
 
-    # 2. Initialize ETA variables
+    # Initialize ETA variables
     tiempo_inicio = time.perf_counter()
     procesados = 0
     eta = 0
@@ -70,79 +82,158 @@ def generic_gather(
     while True:
         record_item = None
         try:
-            # 3. Get next record from queue
             record_item = queue_update_data.get_nowait()
-            display_info, scraper_id_args = get_queue_item(record_item)
+            if is_member_data:
+                id_member, doc_tipo, doc_num = record_item
+                log_item = f"{doc_tipo} {doc_num}"
+            else:
+                placa = record_item
+                log_item = placa
 
-        except Empty:
-            # Log exit and break loop
+        except queue.Empty:
             dash.log(
                 card=card,
-                title=f"{service_name}-{subthread}",
+                title=f"{config_key.upper()}-{subthread} [PROCESADOS: {procesados}]",
                 status=3,
                 text="Inactivo",
                 lastUpdate=f"Fin: {dt.strftime(dt.now(),'%H:%M:%S')}",
             )
             break
 
-        # 4. Main processing loop (with error handling)
-        try:
-            # Log start of processing
-            dash.log(
-                card=card,
-                title=f"{service_name}-{subthread} [Pendientes: {total_original - procesados}]",
-                status=1,
-                text=f"Procesando: {display_info}",
-                lastUpdate=f"ETA: {eta}",
-            )
+        # Log start
+        dash.log(
+            card=card,
+            title=f"{config_key.upper()}-{subthread} [Pendientes: {total_original-procesados}]",
+            status=1,
+            text=f"Procesando: {log_item}",
+            lastUpdate=f"ETA: {eta}",
+        )
 
-            # (SOAT specific: IP restart logic)
-            if service_name == "SOATS" and same_ip_scrapes > 10:
+        try:
+            # Handle special case for SUNARPS captcha-skip logic
+            if config_key == "sunarps" and skip_if_captcha:
+                # This is the original sunarps logic to skip processing due to persistent captcha,
+                # adding an empty response and continuing.
+                with lock:
+                    local_response.append({"Empty": True, "PlacaValidate": record_item})
+                dash.log(action=f"[ {config_key.upper()} ] {log_item}")
+                continue  # Skip actual scraping and go to next item
+
+            # Handle special case for SOAT IP restart logic
+            if config_key == "soats" and same_ip_scrapes > 10:
                 webdriver.quit()
                 webdriver = chromedriver.proxy_driver()
                 same_ip_scrapes = 0
 
-            # Prepare arguments and call scraper
-            scraper_args = prepare_scraper_args(scraper_id_args, webdriver, lock)
-            scraper_response = scraper_func(**scraper_args)
+            # Execute scraper
+            if is_member_data:
+                # Assuming all member data scrapers have 'doc_num' and 'webdriver', and some take 'lock'
+                kwargs = {"doc_num": doc_num, "webdriver": webdriver}
+                if config_key == "recvehic":
+                    kwargs["lock"] = lock  # Only recvehic had lock in browser_wrapper
+                scraper_response = scraper_module.browser_wrapper(**kwargs)
+            else:
+                # Assuming all vehicle data scrapers have 'placa' and 'webdriver'
+                scraper_response = scraper_module.browser_wrapper(
+                    placa=placa, webdriver=webdriver
+                )
 
-            same_ip_scrapes += 1
             procesados += 1
+            if config_key == "soats":
+                same_ip_scrapes += 1
 
-            # 5. Handle Scraper Response (Error/Retry)
+            # Handle scraper errors (string response < 100)
             if isinstance(scraper_response, str) and len(scraper_response) < 100:
                 dash.log(card=card, status=2, lastUpdate=f"ERROR: {scraper_response}")
-
-                # Return record to queue
                 if record_item is not None:
                     queue_update_data.put(record_item)
 
-                # Retry logic
-                if "@" in scraper_response:
+                if "@" in scraper_response:  # Error allows restart
                     dash.log(card=card, text="Reinicio en 10 segundos", status=1)
                     time.sleep(10)
                     continue
 
-                # Fatal error, break thread
-                break
+                break  # Non-restarting error, exit thread
 
-            # 6. Handle Empty Response
+            # Handle empty response
             if not scraper_response:
-                empty_data = {"Empty": True, **scraper_id_args}
-                # SUNARP, SUTRAN, SATMUL, SOAT, REVTEC use PlacaValidate.
-                # RECVEHIC and BREVETES use IdMember_FK.
-                # Add service-specific empty response handling if needed,
-                # but generic dict merging is often enough.
+                empty_response = {"Empty": True}
+                if is_member_data:
+                    empty_response["IdMember_FK"] = id_member
+                else:
+                    empty_response["PlacaValidate"] = placa
+
                 with lock:
-                    local_response.append(empty_data)
-                dash.log(action=f"[ {service_name} ] {display_info}")
+                    local_response.append(empty_response)
+                dash.log(action=f"[ {config_key.upper()} ] {log_item}")
                 continue
 
-            # 7. Process Successful Response
-            with lock:
-                process_response(scraper_response, scraper_id_args, local_response)
+            # Process and store successful response
+            response_data = []
 
-            # 8. Calculate ETA
+            # Special handling for SATIMPS (it updates two lists)
+            if config_key == "satimps":
+                _now = dt.now().strftime("%Y-%m-%d")
+                local_response_codigos, local_response_deudas = local_response
+
+                for _n in scraper_response:
+                    with lock:
+                        local_response_codigos.append(
+                            {
+                                "IdMember_FK": id_member,
+                                "Codigo": _n["codigo"],
+                                "LastUpdate": _now,
+                            }
+                        )
+                    if _n["deudas"]:
+                        for deuda in _n["deudas"]:
+                            with lock:
+                                local_response_deudas.append(
+                                    {
+                                        "Codigo": _n["codigo"],
+                                        "Ano": deuda[0],
+                                        "Periodo": deuda[1],
+                                        "DocNum": deuda[2],
+                                        "TotalAPagar": deuda[3],
+                                        "FechaHasta": deuda[4],
+                                        "LastUpdate": _now,
+                                    }
+                                )
+                    else:
+                        with lock:
+                            local_response_deudas.append(
+                                {"Empty": True, "Codigo": _n["codigo"]}
+                            )
+
+                response_data = (
+                    []
+                )  # No need to append to local_response later, already done with lock
+
+            # Standard processing via response_handler
+            else:
+                # Apply date formatting if needed (used by brevetes, revtecs, satmuls, soats, sutrans)
+                response_to_process = scraper_response
+                if config_key in ["brevetes", "revtecs", "satmuls", "soats", "sutrans"]:
+                    response_to_process = date_to_db_format(data=scraper_response)
+
+                if is_member_data:
+                    final_data = response_handler(
+                        record_item, response_to_process, id_member
+                    )
+                else:
+                    final_data = response_handler(
+                        record_item, response_to_process, placa
+                    )
+
+                # The handler might return a list (e.g., satmuls, sutrans) or a dict (others)
+                response_data = (
+                    final_data if isinstance(final_data, list) else [final_data]
+                )
+
+                with lock:
+                    local_response.extend(response_data)
+
+            # Calculate ETA
             duracion_promedio = (time.perf_counter() - tiempo_inicio) / procesados
             eta = dt.strftime(
                 dt.now()
@@ -150,386 +241,227 @@ def generic_gather(
                 "%H:%M:%S",
             )
 
-            dash.log(action=f"[ {service_name} ] {display_info}")
+            dash.log(action=f"[ {config_key.upper()} ] {log_item}")
+
+        except KeyboardInterrupt:
+            quit()
 
         except exceptions.FunctionTimedOut:
             if record_item is not None:
                 queue_update_data.put(record_item)
             dash.log(card=card, status=2, lastUpdate="ERROR: Timeout")
-            # Continue or break depending on service policy for timeouts
-            if service_name == "BREVETES" or service_name == "SATMULS":
-                break  # Original files break on timeout
-            continue
-
-        except KeyboardInterrupt:
-            quit()
-
-        except Exception as e:
-            # Handle general crash
-            if record_item is not None:
-                queue_update_data.put(record_item)
-            dash.log(
-                card=card,
-                text=f"Crash (Gather): {str(e)[:55]}",
-                status=2,
-            )
             break
 
-    # 9. Close WebDriver
+        except Exception as e:
+            if record_item is not None:
+                queue_update_data.put(record_item)
+            dash.log(card=card, text=f"Crash (Gather): {str(e)[:55]}", status=2)
+            break
+
+    # sacar worker de lista de activos cerrar driver
+    dash.assigned_cards.remove(card)
     webdriver.quit()
 
 
-# --- Service-Specific Configuration Dictionaries ---
+def manage_sub_threads(
+    dash, lock, update_data, full_response, config_key, iterations=None
+):
+    """Manages the creation and lifecycle of sub-threads for a single scraper type."""
 
+    total_inicial = len(update_data)
 
-## 1. MTC Records Vehiculares (RecVehic)
-def recvehic_get_queue_item(record_item):
-    id_member, doc_tipo, doc_num = record_item
-    display_info = f"{doc_tipo} {doc_num}"
-    scraper_id_args = {
-        "IdMember_FK": id_member,
-        "doc_tipo": doc_tipo,
-        "doc_num": doc_num,
-    }
-    return display_info, scraper_id_args
+    # Special handling for SATIMPS (requires two response lists)
+    if config_key == "satimps":
+        local_response_codigos, local_response_deudas = [], []
+        local_response = (local_response_codigos, local_response_deudas)
+        full_response["DataSatImpuestosCodigos"] = local_response_codigos
+        full_response["DataSatImpuestosDeudas"] = local_response_deudas
+    else:
+        local_response = []
+        full_response[SCRAPER_CONFIGS[config_key]["update_key"]] = local_response
 
+    # Load queue
+    queue_update_data = queue.Queue()
+    for item in update_data:
+        queue_update_data.put(item)
 
-def recvehic_prepare_scraper_args(scraper_id_args, webdriver, lock):
-    return {"doc_num": scraper_id_args["doc_num"], "webdriver": webdriver, "lock": lock}
-
-
-def recvehic_process_response(scraper_response, scraper_id_args, local_response):
-    local_response.append(
-        {
-            "IdMember_FK": scraper_id_args["IdMember_FK"],
-            "ImageBytes": scraper_response,
-            "LastUpdate": dt.now().strftime("%Y-%m-%d"),
-        }
-    )
-
-
-RECVEHIC_CONFIG = {
-    "service_name": "Record Vehicular",
-    "driver_config": {"headless": HEADLESS["revtec"]},
-    "scraper_func": scrape_recvehic.browser_wrapper,
-    "get_queue_item": recvehic_get_queue_item,
-    "prepare_scraper_args": recvehic_prepare_scraper_args,
-    "process_response": recvehic_process_response,
-}
-
-
-## 2. SUNARPS (Fichas Sunarp)
-def sunarp_get_queue_item(record_item):
-    placa = record_item
-    display_info = placa
-    scraper_id_args = {"PlacaValidate": placa}
-    return display_info, scraper_id_args
-
-
-def sunarp_prepare_scraper_args(scraper_id_args, webdriver, lock):
-    # lock is not used by sunarp scraper but we pass it for consistency
-    return {"placa": scraper_id_args["PlacaValidate"], "webdriver": webdriver}
-
-
-def sunarp_process_response(scraper_response, scraper_id_args, local_response):
-    _now = dt.now().strftime("%Y-%m-%d")
-    local_response.append(
-        {
-            "IdPlaca_FK": 999,
-            "PlacaValidate": scraper_id_args["PlacaValidate"],
-            # ... other fields from scraper_response ...
-            "ImageBytes": scraper_response,  # Assuming scraper_response is the image bytes
-            "LastUpdate": _now,
-        }
-    )
-
-
-SUNARPS_CONFIG = {
-    "service_name": "SUNARPS",
-    "driver_config": {
-        "headless": HEADLESS["sunarp"],
-        "incognito": True,
-        "window_size": (1920, 1080),
-    },
-    "scraper_func": scrape_sunarp.browser_wrapper,
-    "get_queue_item": sunarp_get_queue_item,
-    "prepare_scraper_args": sunarp_prepare_scraper_args,
-    "process_response": sunarp_process_response,
-}
-
-
-## 3. SUTRAN (Multas Sutran)
-def sutran_get_queue_item(record_item):
-    placa = record_item
-    display_info = placa
-    scraper_id_args = {"PlacaValidate": placa}
-    return display_info, scraper_id_args
-
-
-def sutran_prepare_scraper_args(scraper_id_args, webdriver, lock):
-    return {"placa": scraper_id_args["PlacaValidate"], "webdriver": webdriver}
-
-
-def sutran_process_response(scraper_response, scraper_id_args, local_response):
-    # scraper_response is a list of multas
-    for resp in scraper_response:
-        _n = date_to_db_format(data=resp)
-        local_response.append(
-            {
-                "PlacaValidate": scraper_id_args["PlacaValidate"],
-                "Documento": _n[0],
-                "Tipo": _n[1],
-                "FechaDoc": _n[2],
-                "CodigoInfrac": _n[3],
-                "Clasificacion": _n[4],
-                "LastUpdate": dt.now().strftime("%Y-%m-%d"),
-            }
+    # Log status active
+    with lock:
+        dash.data["scrapers_kpis"].update(
+            {SCRAPER_CONFIGS[config_key]["update_key"]: {"status": "ACTIVO"}}
         )
 
+    start_time = start_time1 = start_time2 = time.perf_counter()
+    threads = []
 
-SUTRANS_CONFIG = {
-    "service_name": "Sutran",
-    "driver_config": {"headless": HEADLESS["revtec"]},  # Uses revtec HEADLESS config
-    "scraper_func": scrape_sutran.browser_wrapper,
-    "get_queue_item": sutran_get_queue_item,
-    "prepare_scraper_args": sutran_prepare_scraper_args,
-    "process_response": sutran_process_response,
-}
+    # Determine max threads
+    max_threads = iterations or max(
+        GATHER_ITERATIONS, 1
+    )  # Fallback to 1 if GATHER_ITERATIONS is not defined or 0
+    max_threads = min(
+        max_threads, total_inicial
+    )  # Never more threads than items to process
 
+    # Launch sub-threads
+    for i in range(max_threads):
+        # Assign next available worker card
+        siguiente_trabajador = 0
+        while siguiente_trabajador in dash.assigned_cards:
+            siguiente_trabajador += 1
+        dash.assigned_cards.append(siguiente_trabajador)
 
-## 4. SOATS (Apeseg Soats)
-def soat_get_queue_item(record_item):
-    placa = record_item
-    display_info = placa
-    scraper_id_args = {"PlacaValidate": placa}
-    return display_info, scraper_id_args
-
-
-def soat_prepare_scraper_args(scraper_id_args, webdriver, lock):
-    return {"placa": scraper_id_args["PlacaValidate"], "webdriver": webdriver}
-
-
-def soat_process_response(scraper_response, scraper_id_args, local_response):
-    _n = date_to_db_format(data=scraper_response)
-    local_response.append(
-        {
-            "IdPlaca_FK": 999,
-            "Aseguradora": _n[0],
-            "FechaInicio": _n[2],
-            "FechaHasta": _n[3],
-            "PlacaValidate": _n[4],
-            # ... other fields ...
-            "ImageBytes": create_certificate(data=copy(_n)),
-            "LastUpdate": dt.now().strftime("%Y-%m-%d"),
-        }
-    )
-
-
-SOATS_CONFIG = {
-    "service_name": "SOATS",
-    "driver_config": {
-        "headless": HEADLESS["soat"],
-        "incognito": True,
-        "window_size": (1920, 1080),
-    },
-    "scraper_func": scrape_soat.browser_wrapper,
-    "get_queue_item": soat_get_queue_item,
-    "prepare_scraper_args": soat_prepare_scraper_args,
-    "process_response": soat_process_response,
-}
-
-
-## 5. SAT Multas (SatMuls)
-def satmul_get_queue_item(record_item):
-    placa = record_item
-    display_info = placa
-    scraper_id_args = {"PlacaValidate": placa}
-    return display_info, scraper_id_args
-
-
-def satmul_prepare_scraper_args(scraper_id_args, webdriver, lock):
-    return {"placa": scraper_id_args["PlacaValidate"], "webdriver": webdriver}
-
-
-def satmul_process_response(scraper_response, scraper_id_args, local_response):
-    # scraper_response is a list of multas
-    for resp in scraper_response:
-        _n = date_to_db_format(data=resp)
-        local_response.append(
-            {
-                "IdPlaca_FK": 999,
-                "PlacaValidate": _n[0],
-                "Reglamento": _n[1],
-                # ... other fields ...
-                "ImageBytes2": _n[14] if len(_n) > 14 else "",
-                "LastUpdate": dt.now().strftime("%Y-%m-%d"),
-            }
+        thread = Thread(
+            target=gather_subthread,
+            args=(
+                config_key,
+                dash,
+                queue_update_data,
+                local_response,
+                total_inicial,
+                lock,
+                siguiente_trabajador,
+                i,
+            ),
+            name=f"{config_key}-{i}",
         )
+        thread.start()
+        threads.append(thread)
+        time.sleep(1.5)  # Stagger start
 
+    # Wait for all threads to finish
+    active_threads = 1
+    while active_threads > 0:
 
-SATMULS_CONFIG = {
-    "service_name": "Multas SAT",
-    "driver_config": {
-        "headless": HEADLESS["satmul"],
-        "incognito": True,
-        "window_size": (1920, 1080),
-    },
-    "scraper_func": scrape_satmul.browser_wrapper,
-    "get_queue_item": satmul_get_queue_item,
-    "prepare_scraper_args": satmul_prepare_scraper_args,
-    "process_response": satmul_process_response,
-}
+        active_threads = sum(1 for thread in threads if thread.is_alive())
 
+        if time.perf_counter() - start_time1 > 90:  # Periodic save
+            start_time1 = time.perf_counter()
+            with lock:
+                update_local_gather_file(full_response)
 
-## 6. SAT Impuestos (SatImps)
-# Note: SAT Impuestos is complex as it returns two lists (codigos and deudas)
-# It requires a custom `manage_sub_threads` logic (as seen in gather_satimps.py)
-# so full centralization into a single `gather` function is not ideal without
-# a major refactor of `manage_sub_threads` in `gather_all.py`.
-# For the purpose of *centralizing* the `gather` logic, we will define its
-# config but acknowledge the need for a separate manager function.
+        if time.perf_counter() - start_time2 > 1:  # Dashboard KPI update
+            start_time2 = time.perf_counter()
+            with lock:
+                update_key = SCRAPER_CONFIGS[config_key]["update_key"]
+                dash.data["scrapers_kpis"][update_key].update(
+                    {"pendientes": queue_update_data.qsize()}
+                )
+                dash.data["scrapers_kpis"][update_key].update(
+                    {"threads_activos": active_threads}
+                )
+                tiempo_restante = (
+                    (time.perf_counter() - start_time)
+                    / (total_inicial - queue_update_data.qsize() or 1)
+                ) * queue_update_data.qsize()
+                dash.data["scrapers_kpis"][update_key].update(
+                    {
+                        "eta": dt.strftime(
+                            dt.now() + td(seconds=tiempo_restante), "%H:%M:%S"
+                        )
+                    }
+                )
+        time.sleep(2)
 
-
-def satimp_get_queue_item(record_item):
-    id_member, doc_tipo, doc_num = record_item
-    display_info = f"{doc_tipo} {doc_num}"
-    scraper_id_args = {
-        "IdMember_FK": id_member,
-        "doc_tipo": doc_tipo,
-        "doc_num": doc_num,
-    }
-    return display_info, scraper_id_args
-
-
-def satimp_prepare_scraper_args(scraper_id_args, webdriver, lock):
-    return {
-        "doc_tipo": scraper_id_args["doc_tipo"],
-        "doc_num": scraper_id_args["doc_num"],
-        "webdriver": webdriver,
-    }
-
-
-def satimp_process_response(scraper_response, scraper_id_args, local_response):
-    # This requires local_response to be a tuple/list of two lists (codigos, deudas),
-    # which breaks the simple local_response list pattern.
-    # We define a placeholder to show the required structure.
-    local_response_codigos = local_response[
-        0
-    ]  # Assumes local_response is passed as a list of shared lists
-    local_response_deudas = local_response[1]
-
-    _now = dt.now().strftime("%Y-%m-%d")
-    for _n in scraper_response:
-        local_response_codigos.append(
-            {
-                "IdMember_FK": scraper_id_args["IdMember_FK"],
-                "Codigo": _n["codigo"],
-                "LastUpdate": _now,
-            }
+    # Final log and update
+    with lock:
+        update_key = SCRAPER_CONFIGS[config_key]["update_key"]
+        dash.data["scrapers_kpis"].update(
+            {update_key: {"status": "INACTIVO", "eta": "", "threads_activos": ""}}
         )
-        # ... logic for deudas ...
+    # The response is already in full_response due to the list/tuple reference, but we update the dict for completeness
+    if config_key != "satimps":
+        full_response.update({update_key: local_response})
 
 
-SATIMPS_CONFIG_PLACEHOLDER = {
-    "service_name": "Impuestos SAT",
-    "driver_config": {"headless": HEADLESS["revtec"]},
-    "scraper_func": scrape_satimp.browser_wrapper,
-    "get_queue_item": satimp_get_queue_item,
-    "prepare_scraper_args": satimp_prepare_scraper_args,
-    "process_response": satimp_process_response,  # Custom logic needed
-}
+# --- Main Dispatcher (From gather_all.py) ---
 
 
-## 7. Revisiones Técnicas (RevTecs)
-def revtec_get_queue_item(record_item):
-    placa = record_item
-    display_info = placa
-    scraper_id_args = {"PlacaValidate": placa}
-    return display_info, scraper_id_args
+def gather_threads(dash, all_updates):
+    """Main function to launch and manage all scraping processes."""
+
+    dash.log(general_status=("Activo", 1))
+
+    lock = Lock()
+    all_threads = []
+    full_response = {}
+    atexit.register(update_local_gather_file, full_response)
+
+    # Create threads for each available update type
+    for key, config in SCRAPER_CONFIGS.items():
+        if all_updates.get(key):
+            # Special case for SATIMPS (uses its own manager structure in the original)
+            if key == "satimps":
+                # Call the unified manage_sub_threads which now handles SATIMPS's dual-list requirement
+                all_threads.append(
+                    Thread(
+                        target=manage_sub_threads,
+                        args=(dash, lock, all_updates[key], full_response, key),
+                    )
+                )
+            else:
+                # Standard thread creation
+                iterations = config.get("iterations")
+                all_threads.append(
+                    Thread(
+                        target=manage_sub_threads,
+                        args=(
+                            dash,
+                            lock,
+                            all_updates[key],
+                            full_response,
+                            key,
+                            iterations,
+                        ),
+                    )
+                )
+
+    # Log status and start threads
+    with lock:
+        dash.data["scrapers_kpis"].update({"extra": {"status": "ACTIVO"}})
+
+    for thread in all_threads:
+        thread.start()
+        time.sleep(2 * GATHER_ITERATIONS)  # Stagger start of main scraper types
+
+    # Periodic saving loop
+    start_time = time.perf_counter()
+    while any(t.is_alive() for t in all_threads):
+        time.sleep(10)
+        if time.perf_counter() - start_time > 90:
+            update_local_gather_file(full_response)
+            start_time = time.perf_counter()
+
+    # Final log updates
+    with lock:
+        dash.data["scrapers_kpis"].update({"extra": {"status": "INACTIVO"}})
+    dash.log(general_status=("Esperando", 2))
+
+    # Final save and return
+    update_local_gather_file(full_response)
+    return full_response
 
 
-def revtec_prepare_scraper_args(scraper_id_args, webdriver, lock):
-    return {"placa": scraper_id_args["PlacaValidate"], "webdriver": webdriver}
-
-
-def revtec_process_response(scraper_response, scraper_id_args, local_response):
-    _n = date_to_db_format(data=scraper_response)
-    local_response.append(
-        {
-            "IdPlaca_FK": 999,
-            "Certificadora": _n[0],
-            "PlacaValidate": _n[2],
-            # ... other fields ...
-            "LastUpdate": dt.now().strftime("%Y-%m-%d"),
-        }
-    )
-
-
-REVTECS_CONFIG = {
-    "service_name": "Revisión Técnica",
-    "driver_config": {"headless": HEADLESS["revtec"]},
-    "scraper_func": scrape_revtec.browser_wrapper,
-    "get_queue_item": revtec_get_queue_item,
-    "prepare_scraper_args": revtec_prepare_scraper_args,
-    "process_response": revtec_process_response,
-}
-
-
-## 8. Brevetes (MTC Brevetes)
-def brevete_get_queue_item(record_item):
-    id_member, doc_tipo, doc_num = record_item
-    display_info = f"{doc_tipo} {doc_num}"
-    scraper_id_args = {
-        "IdMember_FK": id_member,
-        "doc_tipo": doc_tipo,
-        "doc_num": doc_num,
-    }
-    return display_info, scraper_id_args
-
-
-def brevete_prepare_scraper_args(scraper_id_args, webdriver, lock):
-    return {"doc_num": scraper_id_args["doc_num"], "webdriver": webdriver}
-
-
-def brevete_process_response(scraper_response, scraper_id_args, local_response):
-    _n = date_to_db_format(data=scraper_response)
-    local_response.append(
-        {
-            "IdMember_FK": scraper_id_args["IdMember_FK"],
-            "Clase": _n[0],
-            # ... other fields ...
-            "LastUpdate": dt.now().strftime("%Y-%m-%d"),
-        }
-    )
-
-
-BREVETES_CONFIG = {
-    "service_name": "Brevetes",
-    "driver_config": {"headless": HEADLESS["brevetes"]},
-    "scraper_func": scrape_brevete.browser_wrapper,
-    "get_queue_item": brevete_get_queue_item,
-    "prepare_scraper_args": brevete_prepare_scraper_args,
-    "process_response": brevete_process_response,
-}
-
-# --- Export Mapped Configurations ---
-# This dictionary would be used by `gather_all.py` to map the service name
-# to the correct configuration for calling `generic_gather`.
-GATHER_CONFIGS = {
-    "recvehic": RECVEHIC_CONFIG,
-    "sunarps": SUNARPS_CONFIG,
-    "sutrans": SUTRANS_CONFIG,
-    "soats": SOATS_CONFIG,
-    "satmuls": SATMULS_CONFIG,
-    "revtecs": REVTECS_CONFIG,
-    "brevetes": BREVETES_CONFIG,
-    # satimps remains special and should use its own `manage_sub_threads`
-    # which calls its own simplified `gather` or a specially configured `generic_gather`.
-}
-
-
-# To use this, you would refactor `gather_all.py`'s `manage_sub_threads` to call
-# `generic_gather` with the appropriate configuration object.
-def gather(*args, **kwargs):
-    """Alias for the centralized function to maintain original signature style."""
-    return generic_gather(*args, **kwargs)
+# Example usage (needs mock for dash, GATHER_ITERATIONS, etc. to run)
+# if __name__ == "__main__":
+#     # Mock setup for testing
+#     class MockDash:
+#         def __init__(self):
+#             self.data = {"scrapers_kpis": {}}
+#             self.assigned_cards = []
+#         def log(self, *args, **kwargs):
+#             # print(f"DASH LOG: {kwargs}")
+#             pass
+#
+#     # Mock data
+#     MOCK_DASH = MockDash()
+#     MOCK_UPDATES = {
+#         "brevetes": [(1, 'DNI', '12345678'), (2, 'DNI', '87654321')],
+#         "soats": ['ABC000', 'AAA000'], # AAA000 is set to mock a specific success path
+#         "satimps": [(10, 'RUC', '20123456789'), (11, 'DNI', '11111111')]
+#     }
+#     GATHER_ITERATIONS = 2
+#     NETWORK_PATH = os.getcwd() # Use current directory for mock file save
+#
+#     # Run the unified gathering process
+#     # final_data = gather_threads(MOCK_DASH, MOCK_UPDATES)
+#     # print(json.dumps(final_data, indent=4))

@@ -22,6 +22,7 @@ from src.updates import (
     gather_jnemultas,
     gather_jneafils,
     gather_soats,
+    gather_calmul,
 )
 
 # TODO: find a jnemultas with actual multas
@@ -36,6 +37,7 @@ def gather_threads(dash, all_updates):
 
     # log change of dashboard status
     dash.log(general_status=("Activo", 1))
+    dash.scrapers_corriendo = True
 
     lock = Lock()
     all_threads = []
@@ -86,7 +88,6 @@ def gather_threads(dash, all_updates):
                     full_response,
                     gather_satmuls,
                     "DataSatMultas",
-                    GATHER_ITERATIONS * 2,
                 ),
             )
         )
@@ -228,6 +229,22 @@ def gather_threads(dash, all_updates):
             )
         )
 
+    # callao multas
+    if all_updates.get("calmul"):
+        all_threads.append(
+            Thread(
+                target=manage_sub_threads,
+                args=(
+                    dash,
+                    lock,
+                    all_updates["calmul"],
+                    full_response,
+                    gather_calmul,
+                    "DataCallaoMultas",
+                ),
+            )
+        )
+
     # iniciar threads con intervalos para que subthreads puedan iniciar sin generar conflictos
     with lock:
         dash.data["scrapers_kpis"].update(
@@ -262,12 +279,18 @@ def gather_threads(dash, all_updates):
     dash.log(general_status=("Esperando", 2))
 
     # update local changes file and return all update data as a dictionary
+    dash.scrapers_corriendo = False
     update_local_gather_file(full_response)
     return full_response
 
 
 def manage_sub_threads(
-    dash, lock, update_data, full_response, target_func, update_key, iterations=None
+    dash,
+    lock,
+    update_data,
+    full_response,
+    target_func,
+    update_key,
 ):
 
     # create variable that accumulates all sub-thread responses
@@ -292,7 +315,9 @@ def manage_sub_threads(
 
     start_time = start_time1 = start_time2 = time.perf_counter()
     threads = []
-    for i in range(iterations or GATHER_ITERATIONS):
+
+    # abre un maximo de scrapers paralelos del mismo servicio (no mayor a la cantidad de datos a actualizar)
+    for i in range(min(GATHER_ITERATIONS, len(update_data))):
 
         # asignar siguiente trabajador disponible
         siguiente_trabajador = 0
@@ -326,7 +351,7 @@ def manage_sub_threads(
 
         active_threads = sum(1 for thread in threads if thread.is_alive())
 
-        # grabar lo que se tiene en memoria hasta el momento en un archivo
+        # grabar lo que se tiene en memoria hasta el momento en un archivo cada 90 segundos
         if time.perf_counter() - start_time1 > 90:
             start_time1 = time.perf_counter()
             with lock:
@@ -355,8 +380,15 @@ def manage_sub_threads(
                         )
                     }
                 )
+                # fila de acumulado
+                dash.data["scrapers_kpis"]["Acumulado"]["status"] = "INACTIVOXX"
+                dash.data["scrapers_kpis"]["Acumulado"]["pendientes"] = 120
+                dash.data["scrapers_kpis"]["Acumulado"]["eta"] = dt.strftime(
+                    dt.now() + td(seconds=102), "%H:%M:%S"
+                )
+                dash.data["scrapers_kpis"]["Acumulado"]["threads_activos"] = 99
 
-        time.sleep(2)
+        time.sleep(0.5)
 
     # put all respones into global collector variable and switch dashboard status to inactive
     with lock:

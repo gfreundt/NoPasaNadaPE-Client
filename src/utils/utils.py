@@ -2,12 +2,18 @@ from datetime import datetime as dt
 import os
 import re
 import time
+import io
 import requests
 from requests.exceptions import Timeout, ConnectionError, RequestException
 import base64
 import socket
 import json
 import subprocess
+from PIL import (
+    Image,
+    ImageDraw,
+    ImageFont,
+)
 
 
 # import pyautogui
@@ -284,3 +290,32 @@ def stop_vpn():
         return True
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
+
+
+def create_soat_certificate(data):
+    """Generates a SOAT certificate image (Mock implementation from gather_soats.py)."""
+    _resources = os.path.join(r"D:\pythonCode", "Resources", "Fonts")
+    font_small = ImageFont.truetype(os.path.join(_resources, "seguisym.ttf"), 30)
+    font_large = ImageFont.truetype(os.path.join(_resources, "seguisym.ttf"), 45)
+
+    # get list of available company logos (Mocking a list)
+    _templates_path = os.path.join(NETWORK_PATH, "static")
+    cias = [i.split(".")[0] for i in os.listdir(_templates_path)]
+
+    # open blank template image and prepare for edit (Mocking a simple image)
+    base_img = Image.new("RGB", (800, 1200), color="white")
+    editable_img = ImageDraw.Draw(base_img)
+
+    # Mock adding text
+    editable_img.text(
+        (40, 50), f"SOAT Certificate: {data[4]}", font=font_large, fill=(0, 0, 0)
+    )
+    editable_img.text(
+        (40, 100), f"Aseguradora: {data[0]}", font=font_small, fill=(0, 0, 0)
+    )
+
+    # Save image to memory buffer
+    buffer = io.BytesIO()
+    base_img.save(buffer, format="JPEG")
+    buffer.seek(0)
+    return base64.b64encode(buffer.read()).decode("utf-8")

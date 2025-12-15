@@ -1,5 +1,5 @@
 from src.utils.constants import AUTOSCRAPER_REPETICIONES
-from src.utils.utils import send_pushbullet, check_vpn_online, start_vpn, stop_vpn
+from src.utils.utils import send_pushbullet, start_vpn, stop_vpn
 import time
 from datetime import datetime as dt, timedelta as td
 
@@ -22,32 +22,22 @@ def flujo(self, tipo_mensaje):
 
         # si ya no hay actualizaciones pendientes, siguiente paso
         if all([len(j) == 0 for j in pendientes.values()]):
-            print("Limpio")
             stop_vpn()
+            self.vpn_location == ""
             return True
 
         else:
 
             if _first:
-                print("VPN")
-                start_vpn(self.vpn_location)
+                iniciar_vpn_ideal(self, pendientes)
                 self.actualizar()
                 _first = False
                 continue
 
             else:
 
-                # cambiar de pais en VPN
-                stop_vpn()
-                self.log(action="[ VPN OFF ]")
-
-                if self.vpn_location == "PE":
-                    self.vpn_location = "AR"
-                else:
-                    self.vpn_location = "PE"
-
-                start_vpn(self.vpn_location)
-                self.log(action=f"[ VPN PRENDIDA ({self.vpn_location})]")
+                # reevaluar si se debe cambiar de pais de VPN
+                iniciar_vpn_ideal(self, pendientes)
                 self.actualizar()
 
                 # aumentar contador de repeticiones, si excede limite parar
@@ -59,56 +49,68 @@ def flujo(self, tipo_mensaje):
                 time.sleep(3)
 
 
-def enviar_notificacion(mensaje):
+def iniciar_vpn_ideal(self, pendientes):
 
+    # determinar si se necesita solo brevete y recvehic o algo mas
+    solo_mtc = False
+    for key, value_list in pendientes.items():
+        if key not in {"brevetes", "recvehic"}:
+            if value_list:
+                solo_mtc = True
+                break
+
+    # si solo se necesitan servicios mtc, pais debe ser AR
+    pais_necesario = "AR" if solo_mtc else "PE"
+
+    # VPN ya esta en pais necesario, no cambiar VPN
+    if self.vpn_location == pais_necesario:
+        self.log(action=f"[ VPN MANTIENE ( {self.vpn_location} )]")
+        return
+    else:
+        self.vpn_location == pais_necesario
+
+    # para actual pais y empezar el nuevo
+    stop_vpn()
+    start_vpn(self.vpn_location)
+    self.log(action=f"[ VPN PRENDIDA ( {self.vpn_location} )]")
+
+
+def enviar_notificacion(mensaje):
     title = f"NoPasaNada AUTOSCRAPER - {dt.now()}"
     mensaje = "\n".join([i for i in mensaje])
     send_pushbullet(title=title, message=mensaje)
 
 
-def iniciar_corrida(self):
+def main(self):
 
-    self.auto_scraper_corriendo = True
-    self.log(action="[ AUTOSCRAPER ] Inicio")
+    # determinar cantidad de alertas y boletines que hay por procesar
+    por_procesar = [
+        sum([0 if not i[t] else int(i[t]) for i in self.data["scrapers_kpis"].values()])
+        for t in ("alertas", "boletines")
+    ]
 
-    # procesar alertas
-    exito1 = flujo(self, tipo_mensaje="alertas")
-    self.log(action="[ AUTOSCRAPER ] Fin Alertas")
+    # procesar alertas si hay pendientes
+    exito1 = True
+    if por_procesar[0]:
+        exito1 = flujo(self, tipo_mensaje="alertas")
 
-    # procesar boletines
-    exito2 = flujo(self, tipo_mensaje="boletines")
-    self.log(action="[ AUTOSCRAPER ] Fin Boletines")
-
-    # enviar resumen de actividad
-    enviar_notificacion(mensaje="Mensajes enviados")
-
-    # definir nueva hora de correr
-    self.siguiente_cron = dt.now() + td(minutes=5)
-    self.auto_scraper_corriendo = False
+    # procesar boletines si hay pendientes
+    exito2 = True
+    if por_procesar[1]:
+        exito2 = flujo(self, tipo_mensaje="boletines")
 
     if exito1 and exito2:
         # generar y enviar mensajes
         self.generar_alertas()
         self.generar_boletines()
+
         self.enviar_mensajes()
-        # retornar proceso completo
-        return True
+        if self.config_enviar_pushbullet:
+            enviar_notificacion(mensaje="Nuevos mensajes enviados")
 
-    # retornar proceso no puedo terminar
-    return False
+        # informar proceso completo y volver
+        self.log(action="[ AUTOSCRAPER ] OK")
+        return
 
-
-def main(self):
-
-    self.auto_scraper_corriendo = False
-
-    while True:
-        print(
-            f"Autoscraper check: {str(dt.now())[:20]} - Siguiente: {str(self.siguiente_cron)[:20]} - Corriendo: {self.auto_scraper_corriendo}"
-        )
-        if dt.now() > self.siguiente_cron and not self.auto_scraper_corriendo:
-            exito = iniciar_corrida(self)
-            self.log(
-                action=f"[ SERVICIO ] CRON: Autoscraper {"SIN PROBLEMAS" if exito else "NO TERMINO"}. Siguiente: {str(self.siguiente_cron)[:20]}"
-            )
-        time.sleep(30)
+    # informar proceso no puedo terminar
+    self.log(action="[ AUTOSCRAPER ] NO TERMINO.")

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify, redirect
+from flask import Flask, render_template, jsonify, redirect, request
 import threading
 import logging
 from copy import deepcopy as copy
@@ -9,7 +9,7 @@ import subprocess
 import json
 from collections import deque
 import time
-from src.monitor import settings, auto_scraper, cronograma
+from src.monitor import settings, cron
 from src.utils import maintenance
 from src.utils.utils import get_local_ip, check_vpn_online
 from src.utils.constants import (
@@ -57,18 +57,18 @@ class Dashboard:
         # crear estrcutura de variables y valores iniciales
         self.set_initial_data()
 
-        # iniciar en thread paralelo
-        self.iniciar_actualizador_kpis()
-
-        # definir primera localizacion de VPN en PE
-        self.vpn_location = "PE"
-
-        # iniciar cronogramas
-        self.iniciar_cron()
+        # iniciar cron (procesos automaticos que corren cada cierto plazo)
+        cron.main(self)
 
     def set_initial_data(self):
+        self.vpn_location = ""
         self.log_entries = deque(maxlen=55)
         self.assigned_cards = []
+        self.config_autoscraper = True
+        self.config_automensaje = True
+        self.config_enviar_pushbullet = True
+        self.siguiente_autoscraper = dt.now() + td(minutes=5)
+        self.scrapers_corriendo = False
 
         _empty_card = {
             "title": "No Asignado",
@@ -86,34 +86,19 @@ class Dashboard:
             "bottom_left": [],
             "bottom_right": [],
             "scrapers_kpis": {
-                update_key: {
+                key: {
                     "status": "INACTIVO",
                     "pendientes": "",
                     "eta": "",
                     "threads_activos": "",
+                    "alertas": "",
+                    "boletines": "",
                 }
-                for update_key in TABLAS_BD
-            },
+                for key in TABLAS_BD
+            }
+            | {"Acumulado": {}},
+            "scrapers_en_linea": {key: True for key in TABLAS_BD},
         }
-
-    def iniciar_actualizador_kpis(self):
-        """
-        actualiza informacion de vigencia/saldo de servicios de terceros
-        """
-        t = threading.Thread(target=update_kpis.main, args=(self,), daemon=True)
-        t.start()
-        self.log(action="[ SERVICIO ] Actualizado de KPIs activo.")
-
-    def iniciar_cron(self):
-        """
-        activa todos los procesos que corren en cronograma en un thread paralelo
-        """
-        self.siguiente_cron = dt.now() + td(minutes=1)
-        t = threading.Thread(target=auto_scraper.main, args=(self,), daemon=True)
-        self.log(
-            action=f"[ SERVICIO ] CRON: Autoscraper PRENDIDO. Intervalos cada {"5"} minutos."
-        )
-        t.start()
 
     def log(self, **kwargs):
         if "general_status" in kwargs:
@@ -140,7 +125,19 @@ class Dashboard:
 
     # -------- ACCION DE URL DE INGRESO --------
     def dashboard(self):
-        return render_template("dashboard.html")
+        # Pass configuration variables and next run time to the template
+        return render_template(
+            "dashboard.html",
+            config_autoscraper=self.config_autoscraper,
+            config_automensaje=self.config_automensaje,
+            config_enviar_pushbullet=self.config_enviar_pushbullet,
+            siguiente_autoscraper=(
+                self.siguiente_autoscraper.strftime("%H:%M:%S")
+                if self.config_autoscraper
+                else None
+            ),
+            data=self.data,
+        )
 
     # ------- ACCIONES DE APIS (INTERNO) -------
     def get_data(self):
@@ -152,29 +149,80 @@ class Dashboard:
             return jsonify(self.data)
 
     # -------- ACCIONES DE BOTONES ----------
+
+    def toggle_scraper_status(self):
+        """
+        Recibe una solicitud POST desde el frontend para cambiar el estado 'En Linea'
+        de un scraper específico (True/False).
+        """
+        data = request.get_json()
+        service = data.get("service")
+        is_checked = data.get("checked")
+
+        # Utilizamos _ALL_SERVICES para validar que el servicio sea conocido
+        if service and service in TABLAS_BD:
+            with self.data_lock:
+                self.data["scrapers_en_linea"][service] = is_checked
+            self.log(
+                action=f"[ CONFIG ] Scraper {service} toggled {'ON' if is_checked else 'OFF'}"
+            )
+            return jsonify({"success": True})
+        return jsonify({"success": False, "error": "Invalid service"}), 400
+
+    def clear_logs(self):
+        self.log_entries.clear()
+        self.data["bottom_left"].clear()
+        self.log(action="[ SISTEMA ] Registros de Log Limpiados.")
+        return redirect("/")
+
+    def db_vacuum(self):
+        # mandar instruccion a Servidor
+        _json = {"token": UPDATER_TOKEN, "instruction": "vacuum"}
+        response = requests.post(url=self.url, json=_json)
+
+        # actualizar log de dashboard
+        if response.status_code == 200:
+            self.log(action="[ MANTENIMIENTO ] Comando DB Vacuum enviado.")
+        else:
+            self.log(action=f"[ERROR] DB Vacuum: {response.status_code}")
+        return redirect("/")
+
     def datos_alerta(self):
+        # mandar instruccion a servidor
         _json = {
             "token": UPDATER_TOKEN,
             "instruction": "datos_alerta",
         }
         self.actualizar_datos = requests.post(url=self.url, json=_json)
-        _msg = "[ DATOS ALERTA ] " + " ".join(
-            [f"{i}: {len(j)}" for i, j in self.actualizar_datos.json().items()]
-        )
-        self.log(action=_msg)
+
+        # actualizar kpis para dashboard con respuesta
+        total = 0
+        for key, val in zip(TABLAS_BD, self.actualizar_datos.json().values()):
+            self.data["scrapers_kpis"][key]["alertas"] = len(val)
+            total += len(val)
+        self.data["scrapers_kpis"]["Acumulado"]["alertas"] = total
+
+        # actualizar log de dashboard
+        # self.log(action="[ DATOS ALERTA ] Actualizado")
         return redirect("/")
 
     def datos_boletin(self):
+        # mandar instruccion a servidor
         _json = {
             "token": UPDATER_TOKEN,
             "instruction": "datos_boletin",
         }
         self.actualizar_datos = requests.post(url=self.url, json=_json)
-        _msg = "[ DATOS BOLETIN ] " + " ".join(
-            [f"{i[:4]}={len(j)}" for i, j in self.actualizar_datos.json().items()]
-        )
-        self.log(action=_msg)
 
+        # actualizar kpis para dashboard con respuesta
+        total = 0
+        for key, val in zip(TABLAS_BD, self.actualizar_datos.json().values()):
+            self.data["scrapers_kpis"][key]["boletines"] = len(val)
+            total += len(val)
+        self.data["scrapers_kpis"]["Acumulado"]["boletines"] = total
+
+        # actualizar log de dashboard
+        # self.log(action="[ DATOS BOLETIN ] Actualizado")
         return redirect("/")
 
     def actualizar(self):
@@ -226,19 +274,18 @@ class Dashboard:
             "token": UPDATER_TOKEN,
             "instruction": "generar_alertas",
         }
-        self.created_messages = requests.post(url=self.url, json=_json).json()
+        mensajes = requests.post(url=self.url, json=_json).json()
 
         # grabar copia local de los mensjes generados por el servidor
-        for secuencial, texto in enumerate(self.created_messages, start=1):
+        for secuencial, texto in enumerate(mensajes, start=1):
             with open(
                 os.path.join(NETWORK_PATH, "outbound", f"alerta-{secuencial:04d}.html"),
                 "w",
                 encoding="utf-8",
             ) as outfile:
                 outfile.write(texto)
-        self.log(
-            action=f"[ CREAR MENSAJES ] Mensajes Creados: {len(self.created_messages)}"
-        )
+        if len(mensajes) > 0:
+            self.log(action=f"[ CREAR ALERTAS ] Total: {len(mensajes)}")
 
         # mantenerse en la misma pagina
         return redirect("/")
@@ -253,10 +300,10 @@ class Dashboard:
             "token": UPDATER_TOKEN,
             "instruction": "generar_boletines",
         }
-        self.created_messages = requests.post(url=self.url, json=_json).json()
+        mensajes = requests.post(url=self.url, json=_json).json()
 
         # grabar copia local de los mensjes generados por el servidor
-        for secuencial, texto in enumerate(self.created_messages, start=1):
+        for secuencial, texto in enumerate(mensajes, start=1):
             with open(
                 os.path.join(
                     NETWORK_PATH, "outbound", f"boletin-{secuencial:04d}.html"
@@ -265,9 +312,8 @@ class Dashboard:
                 encoding="utf-8",
             ) as outfile:
                 outfile.write(texto)
-        self.log(
-            action=f"[ CREAR MENSAJES ] Mensajes Creados: {len(self.created_messages)}"
-        )
+        if len(mensajes) > 0:
+            self.log(action=f"[ CREAR BOLETINES ] Total: {len(mensajes)}")
 
         # mantenerse en la misma pagina
         return redirect("/")
@@ -277,8 +323,12 @@ class Dashboard:
             "token": UPDATER_TOKEN,
             "instruction": "send_messages",
         }
-        sent_messages = requests.post(url=self.url, json=_json)
-        self.log(action=f"*** Mensajes enviados: {sent_messages.json()}")
+        mensajes = requests.post(url=self.url, json=_json).json()
+
+        if mensajes["ALERTA"] != 0 or mensajes["BOLETIN"] != 0:
+            self.log(
+                action=f"[ ENVIAR MENSAJES ] Alertas: {mensajes["ALERTA"]} | Boletines: {mensajes["BOLETIN"]}"
+            )
 
         return redirect("/")
 

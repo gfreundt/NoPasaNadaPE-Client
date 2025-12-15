@@ -66,17 +66,17 @@ def gather(
                 # devolver registro a la cola para que otro thread lo complete
                 if record_item is not None:
                     queue_update_data.put(record_item)
-                
+
                 # si error permite reinicio ("@") esperar 10 segundos y empezar otra vez
                 if "@" in scraper_response:
-                        dash.log(
-                            card=card,
-                            text="Reinicio en 10 segundos",
-                            status=1,
-                        )
-                        time.sleep(10)
-                        continue
-                
+                    dash.log(
+                        card=card,
+                        text="Reinicio en 10 segundos",
+                        status=1,
+                    )
+                    time.sleep(10)
+                    continue
+
                 # si error no permite reinicio, salir
                 break
 
@@ -134,5 +134,6 @@ def gather(
             )
             break
 
-    # cerrar el driver antes de volver
+    # sacar worker de lista de activos cerrar driver
+    dash.assigned_cards.remove(card)
     webdriver.quit()
