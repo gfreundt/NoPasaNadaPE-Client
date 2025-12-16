@@ -116,3 +116,9 @@ def set_routes(self):
         self.toggle_scraper_status,
         methods=["POST"],
     )
+    self.app.add_url_rule(
+        "/toggle_config",
+        "toggle_config",
+        self.toggle_config,
+        methods=["POST"],
+    )

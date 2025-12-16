@@ -64,9 +64,10 @@ class Dashboard:
         self.vpn_location = ""
         self.log_entries = deque(maxlen=55)
         self.assigned_cards = []
-        self.config_autoscraper = True
-        self.config_automensaje = True
-        self.config_enviar_pushbullet = True
+        self.config_autoscraper = False
+        self.config_automensaje = False
+        self.config_enviar_pushbullet = False
+        self.config_obligar_vpn = True
         self.siguiente_autoscraper = dt.now() + td(minutes=5)
         self.scrapers_corriendo = False
 
@@ -228,7 +229,7 @@ class Dashboard:
     def actualizar(self):
 
         # detener si VPN no esta en linea
-        if not check_vpn_online():
+        if not check_vpn_online() and self.config_obligar_vpn:
             self.log(
                 action="[ ACTUALIZACION ] ERROR - VPN no esta en linea.",
             )
@@ -349,6 +350,45 @@ class Dashboard:
             json.dump(response, outfile)
         self.log(action="DB Info Actualizada")
         return redirect("/")
+
+    def toggle_config(self):
+        """
+        Recibe una solicitud POST desde el frontend para cambiar el estado de las
+        configuraciones principales (Autoscraper, Automensajes, Pushbullet).
+        """
+        if not request.is_json:
+            return jsonify({"success": False, "error": "Missing JSON in request"}), 400
+
+        data = request.get_json()
+
+        # Expects a single key/value pair, e.g., {"autoscraper": True}
+        for key, new_status in data.items():
+            # Validate the key and ensure the status is a boolean
+            if key in [
+                "autoscraper",
+                "automensaje",
+                "enviar_pushbullet",
+            ] and isinstance(new_status, bool):
+                attr_name = f"config_{key}"
+
+                with self.data_lock:
+                    # Use setattr to dynamically update the class attribute
+                    setattr(self, attr_name, new_status)
+
+                self.log(
+                    action=f"[ CONFIG ] {key.capitalize()} toggled {'ON' if new_status else 'OFF'}"
+                )
+                return (
+                    jsonify(
+                        {"success": True, "message": f"{key} updated successfully."}
+                    ),
+                    200,
+                )
+
+        return (
+            jsonify({"success": False, "error": "Invalid configuration key or status"}),
+            400,
+        )
 
     def actualizar_logs(self):
         _json = {"token": UPDATER_TOKEN, "instruction": "get_logs", "max": 100}

@@ -209,6 +209,7 @@ def get_test_data(sample_size=[5, 5, 5, 5, 5, 5, 5, 5]):
             "CHO571",
         ],
         "sunarps": [
+            "CRN441",
             "D8R344",
             "B5L097",
             "ACU640",

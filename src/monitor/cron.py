@@ -15,9 +15,8 @@ def thread(self):
         self.datos_alerta()
         self.datos_boletin()
 
-        # 3. Empieza el scraping automatico si el switch esta prendido
-        if self.config_autoscraper:
-            auto_scraper.main(self)
+        # 3. Empieza el scraping automatico
+        auto_scraper.main(self)
 
         # 99. Espera dos minutos antes de volver a empezar
         time.sleep(120)

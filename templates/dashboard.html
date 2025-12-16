@@ -92,7 +92,7 @@
                                         <td class="text-center fw-bold">DataMtcBrevetes</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataMtcBrevetes" data-service="DataMtcBrevetes" 
                                                        {% if data.scrapers_en_linea['DataMtcBrevetes'] %}checked{% endif %}>
                                             </div>
@@ -108,7 +108,7 @@
                                         <td class="text-center fw-bold">DataMtcRecordsConductores</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataMtcRecordsConductores" data-service="DataMtcRecordsConductores" 
                                                        {% if data.scrapers_en_linea['DataMtcRecordsConductores'] %}checked{% endif %}>
                                             </div>
@@ -124,7 +124,7 @@
                                         <td class="text-center fw-bold">DataMtcRevisionesTecnicas</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataMtcRevisionesTecnicas" data-service="DataMtcRevisionesTecnicas" 
                                                        {% if data.scrapers_en_linea['DataMtcRevisionesTecnicas'] %}checked{% endif %}>
                                             </div>
@@ -140,7 +140,7 @@
                                         <td class="text-center fw-bold">DataSatImpuestos</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataSatImpuestos" data-service="DataSatImpuestos" 
                                                        {% if data.scrapers_en_linea['DataSatImpuestos'] %}checked{% endif %}>
                                             </div>
@@ -156,7 +156,7 @@
                                         <td class="text-center fw-bold">DataSatMultas</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataSatMultas" data-service="DataSatMultas" 
                                                        {% if data.scrapers_en_linea['DataSatMultas'] %}checked{% endif %}>
                                             </div>
@@ -172,7 +172,7 @@
                                         <td class="text-center fw-bold">DataApesegSoats</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataApesegSoats" data-service="DataApesegSoats" 
                                                        {% if data.scrapers_en_linea['DataApesegSoats'] %}checked{% endif %}>
                                             </div>
@@ -188,7 +188,7 @@
                                         <td class="text-center fw-bold">DataSunarpFichas</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataSunarpFichas" data-service="DataSunarpFichas" 
                                                        {% if data.scrapers_en_linea['DataSunarpFichas'] %}checked{% endif %}>
                                             </div>
@@ -204,7 +204,7 @@
                                         <td class="text-center fw-bold">DataSutranMultas</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataSutranMultas" data-service="DataSutranMultas" 
                                                        {% if data.scrapers_en_linea['DataSutranMultas'] %}checked{% endif %}>
                                             </div>
@@ -220,7 +220,7 @@
                                         <td class="text-center fw-bold">DataCallaoMultas</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-DataCallaoMultas" data-service="DataCallaoMultas" 
                                                        {% if data.scrapers_en_linea['DataCallaoMultas'] %}checked{% endif %}>
                                             </div>
@@ -236,7 +236,7 @@
                                         <td class="text-center fw-bold">Consolidado</td>
                                         <td class="text-center">
                                             <div class="form-check form-switch d-inline-block">
-                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" 
+                                                <input class="form-check-input scraper-switch" type="checkbox" role="switch" onchange="handleScraperToggle(this)"
                                                        id="switch-Consolidado" data-service="Consolidado" 
                                                        {% if data.scrapers_en_linea['Consolidado'] %}checked{% endif %}>
                                             </div>
@@ -371,23 +371,20 @@
                             <div class="text-center fw-bold mb-3 small">Configuracion</div>
                             
                             <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="autoscraperSwitch" {% if config_autoscraper %}checked{% endif %} onchange="toggleAutoscraperStatus()">
+                                <input class="form-check-input" type="checkbox" id="autoscraperSwitch" data-config-key="autoscraper"
+                                       onchange="handleConfigToggle(this)"> 
                                 <label class="form-check-label small" for="autoscraperSwitch">Autoscraper</label>
-                            </div>
-
-                            <div id="autoscraper-status" class="small text-muted mb-2" style="padding-left: 1.5rem; {% if not config_autoscraper %}display:none;{% endif %}">
-                                Siguiente: <strong id="siguiente-autoscraper-value">
-                                    {{ siguiente_autoscraper | default('--') }}
-                                </strong>
                             </div>
                             
                             <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="automensajesSwitch" {% if config_automensaje %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="automensajesSwitch" data-config-key="automensaje"
+                                       onchange="handleConfigToggle(this)">
                                 <label class="form-check-label small" for="automensajesSwitch">Automensajes</label>
                             </div>
                             
                             <div class="form-check form-switch mb-2">
-                                <input class="form-check-input" type="checkbox" id="pushbulletSwitch" {% if config_enviar_pushbullet %}checked{% endif %}>
+                                <input class="form-check-input" type="checkbox" id="pushbulletSwitch" data-config-key="enviar_pushbullet"
+                                       onchange="handleConfigToggle(this)">
                                 <label class="form-check-label small" for="pushbulletSwitch">Pushbullet</label>
                             </div>
                             
@@ -402,19 +399,98 @@
     </div>
 
 <script>
-    function toggleAutoscraperStatus() {
-        const checkbox = document.getElementById('autoscraperSwitch');
-        const statusDiv = document.getElementById('autoscraper-status');
+    
+    /**
+     * Handles the state change for any individual scraper switch and sends the new state to the Flask server.
+     * Uses data-service attribute to identify the scraper.
+     * @param {HTMLInputElement} checkbox - The switch input element.
+     */
+    function handleScraperToggle(checkbox) {
+        const scraperKey = checkbox.getAttribute('data-service');
+        const newState = checkbox.checked; // true (on) or false (off)
         
-        if (checkbox.checked) {
-            statusDiv.style.display = 'block';
-        } else {
-            statusDiv.style.display = 'none';
-        }
+        // 1. Prepare the data to send 
+        const data = {
+            'scraper_name': scraperKey, // Key used by monitor.py's toggle_scraper_status
+            'status': newState
+        };
+
+        // 2. Send the request to the Flask server
+        fetch('/toggle_scraper_status', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data) 
+        })
+        .then(response => {
+            if (!response.ok) {
+                console.error(`Server error when toggling scraper ${scraperKey}:`, response.statusText);
+                alert(`Error updating scraper ${scraperKey} status on the server.`); 
+                // Revert the switch state on failure
+                checkbox.checked = !newState;
+                throw new Error('Server update failed.');
+            }
+            return response.json(); 
+        })
+        .then(data => {
+            console.log(`Scraper ${scraperKey} status updated successfully:`, data.message);
+        })
+        .catch(error => {
+            if (error.message !== 'Server update failed.') {
+                console.error('Network or fetch error:', error);
+                alert('Could not connect to the server.');
+                // Revert the switch state on network/connection failure
+                checkbox.checked = !newState;
+            }
+        });
     }
 
-    // Call on load to ensure initial state is correct, overriding the inline style if necessary (though the Jinja handles this)
-    document.addEventListener('DOMContentLoaded', toggleAutoscraperStatus);
+    /**
+     * Handles the state change for any config switch (Autoscraper, Automensajes, Pushbullet) 
+     * and sends the new state to the Flask server.
+     * Uses data-config-key attribute to identify the setting.
+     * @param {HTMLInputElement} checkbox - The switch input element.
+     */
+    function handleConfigToggle(checkbox) {
+        const configKey = checkbox.getAttribute('data-config-key');
+        const newState = checkbox.checked; // true (on) or false (off)
+        
+        // 1. Prepare the data to send 
+        const data = {};
+        data[configKey] = newState;
+
+        // 2. Send the request to the Flask server
+        fetch('/toggle_config', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data) 
+        })
+        .then(response => {
+            if (!response.ok) {
+                console.error(`Server error when toggling ${configKey}:`, response.statusText);
+                alert(`Error updating ${configKey} status on the server.`); 
+                // Revert the switch state on failure
+                checkbox.checked = !newState;
+                throw new Error('Server update failed.');
+            }
+            return response.json(); 
+        })
+        .then(data => {
+            console.log(`${configKey} status updated successfully:`, data.message);
+        })
+        .catch(error => {
+            if (error.message !== 'Server update failed.') {
+                console.error('Network or fetch error:', error);
+                alert('Could not connect to the server.');
+                // Revert the switch state on network/connection failure
+                checkbox.checked = !newState;
+            }
+        });
+    }
+
 </script>
 <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 

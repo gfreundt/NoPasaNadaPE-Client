@@ -16,8 +16,11 @@ def main():
                 param = "TEST"
             elif "DEV" in "".join(sys.argv).upper():
                 param = "DEV"
-            else:
+            elif "PROD" in "".join(sys.argv).upper():
                 param = "PROD"
+            else:
+                print("******** Especificar ambiente ********")
+                return
 
             # crear objecto de dashboard y ejecutar servidor de Flask
             dash = monitor.Dashboard(param)
@@ -37,4 +40,4 @@ def main():
 if __name__ == "__main__":
     # sitecustomize.py active in .venv
     main()
-    print("------------ FIN CRTL+C de MAIN ----------")
+    print("------------ FIN NATURAL de MAIN ----------")

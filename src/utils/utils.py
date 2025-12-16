@@ -14,6 +14,9 @@ from PIL import (
     ImageDraw,
     ImageFont,
 )
+from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 
 
 # import pyautogui
@@ -22,6 +25,7 @@ from selenium.webdriver.common.by import By
 from src.utils.constants import (
     MONTHS_3_LETTERS,
     TWOCAPTCHA_API_KEY,
+    TRUECAPTCHA_API_KEY,
     PUSHBULLET_API_TOKEN,
     NETWORK_PATH,
     OVPN_CONFIG,
@@ -118,7 +122,7 @@ def use_truecaptcha(image, retries=3):
     _url = "https://api.apitruecaptcha.org/one/gettext"
     _data = {
         "userid": "gabfre@gmail.com",
-        "apikey": "UEJgzM79VWFZh6MpOJgh",
+        "apikey": TRUECAPTCHA_API_KEY,
         "data": base64.b64encode(image.read()).decode("ascii"),
     }
     while True:
@@ -163,7 +167,7 @@ def solve_recaptcha(webdriver, page_url):
 
         # Poll until solved
         token = None
-        for _ in range(48):  # ~4 minutes max
+        for _ in range(48):  # ~8 minutes max
             time.sleep(5)
             check = requests.get(
                 "http://2captcha.com/res.php",
@@ -186,6 +190,81 @@ def solve_recaptcha(webdriver, page_url):
 
     except Exception:
         return False
+
+
+def solve_cloudflare_turnstile(webdriver, page_url, TWOCAPTCHA_API_KEY):
+    solved_input = WebDriverWait(webdriver, 5).until(
+        EC.presence_of_element_located((By.NAME, "cf-turnstile-response"))
+    )
+    existing_token = solved_input.get_attribute("value")
+
+    if existing_token:
+        print(
+            "Turnstile challenge already solved by the browser! Using existing token."
+        )
+        # If the token is already present, the WebDriver can proceed without 2Captcha.
+        return existing_token
+
+    sitekey_element = webdriver.find_element(By.CSS_SELECTOR, ".cf-turnstile")
+    sitekey = sitekey_element.get_attribute("data-sitekey")
+
+    if not sitekey:
+        print("Error: Could not extract the Turnstile data-sitekey.")
+        return False
+
+    resp = requests.post(
+        "http://2captcha.com/in.php",
+        data={
+            "key": TWOCAPTCHA_API_KEY,
+            "method": "turnstile",
+            "sitekey": sitekey,
+            "pageurl": page_url,
+        },
+    ).text
+
+    if "OK|" not in resp:
+        print(f"Error submitting CAPTCHA to 2Captcha: {resp}")
+        return False
+
+    task_id = resp.split("|")[1]
+    print(f"Successfully submitted task. Task ID: {task_id}")
+
+    # --- 4. Poll until solved ---
+    token = None
+    for attempt in range(48):
+        time.sleep(5)
+        check = requests.get(
+            "http://2captcha.com/res.php",
+            params={"key": TWOCAPTCHA_API_KEY, "action": "get", "id": task_id},
+        ).text
+
+        if check == "CAPCHA_NOT_READY":
+            continue
+
+        if "OK|" in check:
+            token = check.split("|")[1]
+            print("CAPTCHA solved successfully by 2Captcha!")
+            break
+
+        print(f"Error while polling for result: {check}")
+        return False
+
+    if not token:
+        print("Failed to get CAPTCHA token within the timeout.")
+        return False
+
+    # --- 5. Inject the token into the page (Crucial Step) ---
+    # The token must be injected into the hidden input field named 'cf-turnstile-response'
+    # If the element is not there, we have to create it.
+    webdriver.execute_script(
+        f'document.getElementsByName("cf-turnstile-response")[0].value = "{token}";'
+    )
+    print("Token injected into the 'cf-turnstile-response' field.")
+
+    # In case the site uses a submit button, you might need to click it again
+    # to trigger the final check after the token is injected.
+
+    return token
 
 
 def base64_to_image(base64_string, output_path):

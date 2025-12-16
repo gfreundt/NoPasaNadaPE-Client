@@ -51,6 +51,9 @@ def flujo(self, tipo_mensaje):
 
 def iniciar_vpn_ideal(self, pendientes):
 
+    if not self.config_obligar_vpn:
+        return
+
     # determinar si se necesita solo brevete y recvehic o algo mas
     solo_mtc = False
     for key, value_list in pendientes.items():
@@ -67,7 +70,7 @@ def iniciar_vpn_ideal(self, pendientes):
         self.log(action=f"[ VPN MANTIENE ( {self.vpn_location} )]")
         return
     else:
-        self.vpn_location == pais_necesario
+        self.vpn_location = pais_necesario
 
     # para actual pais y empezar el nuevo
     stop_vpn()
@@ -82,6 +85,10 @@ def enviar_notificacion(mensaje):
 
 
 def main(self):
+
+    if not self.config_autoscraper:
+        self.log(action="[ AUTOSCRAPER ] OFFLINE")
+        return
 
     # determinar cantidad de alertas y boletines que hay por procesar
     por_procesar = [

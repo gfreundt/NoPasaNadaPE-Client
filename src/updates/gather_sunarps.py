@@ -34,7 +34,7 @@ def gather(
             record_item = queue_update_data.get_nowait()
             placa = record_item
 
-            # mientras dure captcha...
+            # ---------- EMERGENCIA > SOLO MIENTRAS DURE CAPTCHA
             with lock:
                 local_response.append(
                     {

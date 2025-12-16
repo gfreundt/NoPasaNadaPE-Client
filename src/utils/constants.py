@@ -26,9 +26,7 @@ INTERNAL_AUTH_TOKEN = "xsw5R0oHBUJWJhxUqTmHdGmuYhHUNVy62bdJMPtxFjXgjdpCg5K3NgIXQ
 EXTERNAL_AUTH_TOKEN = "6f1a9d4b27c3e8a0f5b19c2d43e7a8d1"
 
 # BrightData  proxy
-PROXY_DC_USERNAME = (
-    "brd-customer-hl_8874517e-zone-datacenter_proxy1:session_random=1"  # not used
-)
+PROXY_DC_USERNAME = "brd-customer-hl_8874517e-zone-datacenter_proxy1:session_random=1"
 PROXY_DC_USERNAME = "brd-customer-hl_8874517e-zone-datacenter_proxy1-session-"
 PROXY_RES_USERNAME = (
     "brd-customer-hl_8874517e-zone-residential_proxy1-country-pe-session-"
@@ -44,10 +42,6 @@ TRUECAPTCHA_API_KEY = "UEJgzM79VWFZh6MpOJgh"
 
 # 2captcha recaptcha solver
 TWOCAPTCHA_API_KEY = "852d1d8f6c105fbc6b5d86abed7a2370"
-
-# google cloud
-GC_BILLING_ACCOUNT_ID = "012345-67890A-BCDEF0"  # FAKE!
-GC_BUDGET_ID = "projects/123456789012/budgets/MyMonthlyBudget"  # FAKE!
 
 # pushbullet
 PUSHBULLET_API_TOKEN = "o.BMp5HNWSPNMS8Gbqsufntv94feuklPMg"
@@ -100,7 +94,7 @@ HEADLESS = {
     "satmul": True,
     "recvehic": True,
     "revtec": True,
-    "sunarp": True,
+    "sunarp": False,
     "sunat": True,
     "sutran": True,
     "calmul": True,
