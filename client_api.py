@@ -45,27 +45,6 @@ def alta_prueba(url, correo):
         },
     ]
 
-    clientes = [
-        {
-            "nombre": "Juan Pérez",
-            "tipo_documento": "DNI",
-            "numero_documento": "12345678",
-            "celular": "987654321",
-            "codigo_externo": "CLI-001",
-            "perfil": "VIP3",
-            "correo": "juan.perez@dominio.com",
-        },
-        {
-            "nombre": "",
-            "tipo_documento": "CE",
-            "numero_documento": "",
-            "celular": "",
-            "codigo_externo": "CLI-001",
-            "perfil": "REGULAR7",
-            "correo": "jose.lopez@dominio.com",
-        },
-    ]
-
     return requests.post(
         url=url + "/api/v1",
         headers=HEADER,
@@ -134,7 +113,7 @@ def kill_prueba(url, correo):
 
 
 url = "https://dev.nopasanadape.com"  # DEV
-url = "http://localhost:5000"  # TEST
+# url = "http://localhost:5000"  # TEST
 args = sys.argv
 
 if len(args) < 2:

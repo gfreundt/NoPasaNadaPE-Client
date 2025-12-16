@@ -55,11 +55,11 @@ def iniciar_vpn_ideal(self, pendientes):
         return
 
     # determinar si se necesita solo brevete y recvehic o algo mas
-    solo_mtc = False
+    solo_mtc = True
     for key, value_list in pendientes.items():
         if key not in {"brevetes", "recvehic"}:
             if value_list:
-                solo_mtc = True
+                solo_mtc = False
                 break
 
     # si solo se necesitan servicios mtc, pais debe ser AR
@@ -91,33 +91,42 @@ def main(self):
         return
 
     # determinar cantidad de alertas y boletines que hay por procesar
-    por_procesar = [
-        sum([0 if not i[t] else int(i[t]) for i in self.data["scrapers_kpis"].values()])
-        for t in ("alertas", "boletines")
-    ]
+    try:
+        por_procesar = [
+            sum(
+                [
+                    0 if not i.get(t) else int(i[t])
+                    for i in self.data["scrapers_kpis"].values()
+                ]
+            )
+            for t in ("alertas", "boletines")
+        ]
 
-    # procesar alertas si hay pendientes
-    exito1 = True
-    if por_procesar[0]:
-        exito1 = flujo(self, tipo_mensaje="alertas")
+        # procesar alertas si hay pendientes
+        exito1 = True
+        if por_procesar[0]:
+            exito1 = flujo(self, tipo_mensaje="alertas")
 
-    # procesar boletines si hay pendientes
-    exito2 = True
-    if por_procesar[1]:
-        exito2 = flujo(self, tipo_mensaje="boletines")
+        # procesar boletines si hay pendientes
+        exito2 = True
+        if por_procesar[1]:
+            exito2 = flujo(self, tipo_mensaje="boletines")
 
-    if exito1 and exito2:
-        # generar y enviar mensajes
-        self.generar_alertas()
-        self.generar_boletines()
+        if exito1 and exito2:
+            # generar y enviar mensajes
+            self.generar_alertas()
+            self.generar_boletines()
 
-        self.enviar_mensajes()
-        if self.config_enviar_pushbullet:
-            enviar_notificacion(mensaje="Nuevos mensajes enviados")
+            self.enviar_mensajes()
+            if self.config_enviar_pushbullet:
+                enviar_notificacion(mensaje="Nuevos mensajes enviados")
 
-        # informar proceso completo y volver
-        self.log(action="[ AUTOSCRAPER ] OK")
-        return
+            # informar proceso completo y volver
+            self.log(action="[ AUTOSCRAPER ] OK")
+            return
 
-    # informar proceso no puedo terminar
-    self.log(action="[ AUTOSCRAPER ] NO TERMINO.")
+        # informar proceso no puedo terminar
+        self.log(action="[ AUTOSCRAPER ] NO TERMINO.")
+
+    except Exception as e:
+        print(f"Error {e}")
